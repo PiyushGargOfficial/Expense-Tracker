@@ -19,6 +19,10 @@ Free-tier deploy: Vercel (app) + Neon (database).
 with threshold alerts; recurring items (never posted automatically: tick the ones you paid and add them to expenses; highlighted when due soon); search, filter, sort;
 CSV import/export; reports (by category, month over month, top merchants); account deletion.
 
+**Accounts**: balance per account (starting balance plus recorded transactions, per currency), and for credit
+cards the amount owed, limit, available credit, utilisation, statement and payment due dates, minimum payment,
+interest rate, and what was paid since the last statement. Cards due within 7 days are flagged.
+
 **Groups**: create groups, invite link, name-only members (claimable on join), equal / exact / percent / shares /
 itemized splits, single or multiple payers, per-group balances, simplified "who owes whom", partial settle-up
 (cash, Interac e-Transfer, bank transfer, cheque, PayPal), edit/delete (creator or admin, soft delete), audit log activity feed, comments.

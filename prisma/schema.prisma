@@ -42,6 +42,17 @@ model Account {
   name      String
   kind      AccountKind @default(CASH)
   currency  String      @default("CAD")
+  institution String?
+  last4       String?
+  // Signed balance the account started with, before any recorded transaction. A credit card that starts with
+  // $500 owed stores -50000. The current balance is this plus the recorded transactions.
+  openingMinor Int      @default(0)
+  // Credit cards only. Days are the day of the month (1-31; short months use their last day).
+  creditLimitMinor Int?
+  statementDay     Int?
+  dueDay           Int?
+  aprBps           Int?  // annual interest in basis points: 19.99% is 1999
+  minPaymentMinor  Int?
   txns      Transaction[] @relation("TxnAccount")
   incoming  Transaction[] @relation("TxnToAccount")
   archived  Boolean     @default(false)
@@ -54,6 +65,8 @@ enum AccountKind {
   BANK
   CARD
   WALLET
+  SAVINGS
+  CREDIT
 }
 
 model Category {

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { CURRENCIES } from "@/lib/money";
-import { addAccount, addCategory, deleteAccount } from "@/app/actions";
+import Link from "next/link";
+import { addCategory, deleteAccount } from "@/app/actions";
 import ImportForm from "@/components/ImportForm";
 import TwoFactor from "@/components/TwoFactor";
 
@@ -17,13 +17,8 @@ export default async function Settings() {
 
       <section className="card space-y-2">
         <h2 className="font-semibold">Accounts</h2>
-        <ul className="text-sm">{accounts.map((a) => <li key={a.id}>{a.name} <span className="text-muted">{a.kind.toLowerCase()} · {a.currency}</span></li>)}</ul>
-        <form action={addAccount} className="grid grid-cols-3 gap-2">
-          <input name="name" className="input col-span-3" placeholder="TD chequing, RBC Visa, PayPal…" aria-label="Account name" required />
-          <select name="kind" className="input" aria-label="Kind"><option value="CASH">Cash</option><option value="BANK">Bank</option><option value="CARD">Card</option><option value="WALLET">Wallet</option></select>
-          <select name="currency" className="input" aria-label="Currency" defaultValue={user.defaultCurrency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
-          <button className="btn">Add</button>
-        </form>
+        <p className="text-sm text-muted">You have {accounts.filter((a) => !a.archived).length} account{accounts.filter((a) => !a.archived).length === 1 ? "" : "s"}. Balances, credit cards and due dates are on the Accounts page.</p>
+        <Link href="/accounts" className="btn-ghost inline-flex">Manage accounts</Link>
       </section>
 
       <section className="card space-y-2">

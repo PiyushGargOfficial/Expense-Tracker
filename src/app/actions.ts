@@ -7,7 +7,8 @@ import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { requireUser, requireMember } from "@/lib/session";
-import { parseToMinor } from "@/lib/money";
+import { CURRENCIES, parseToMinor } from "@/lib/money";
+import { KIND_VALUES, deltaFor, parseAprBps, parseSigned, type AccountKindValue } from "@/lib/accounts";
 import { deleteGroupExpense, deleteSettlement, updateGroupExpense } from "@/lib/ops";
 import { parseCsv } from "@/lib/csv";
 import { headers } from "next/headers";
@@ -88,12 +89,71 @@ export async function deleteTxn(id: string) {
   revalidatePath("/");
 }
 
-export async function addAccount(f: FormData) {
+type SaveResult = { ok: true } | { ok: false; error: string };
+
+/** Adds an account (id null) or edits one. On edit the "current balance" is turned back into an opening balance. */
+export async function saveAccount(id: string | null, f: FormData): Promise<SaveResult> {
   const u = await requireUser();
-  const name = s(f, "name");
-  if (!name) return;
-  await db.account.create({ data: { userId: u.id, name, kind: s(f, "kind") as "CASH", currency: s(f, "currency") || u.defaultCurrency } });
-  revalidatePath("/settings");
+  const name = s(f, "name").slice(0, 60);
+  if (!name) return { ok: false, error: "Give the account a name" };
+  const kind = s(f, "kind") as AccountKindValue;
+  if (!KIND_VALUES.includes(kind)) return { ok: false, error: "Pick an account type" };
+  const existing = id ? await db.account.findFirst({ where: { id, userId: u.id } }) : null;
+  if (id && !existing) return { ok: false, error: "Account not found" };
+  const currency = existing ? existing.currency : s(f, "currency") || u.defaultCurrency;
+  if (!(CURRENCIES as readonly string[]).includes(currency)) return { ok: false, error: "Unknown currency" };
+  const money = (x: string) => parseToMinor(x, currency);
+
+  const credit = kind === "CREDIT";
+  const rawBalance = s(f, "balance") || "0";
+  const entered = credit ? money(rawBalance) : parseSigned(rawBalance, money);
+  if (entered === null) return { ok: false, error: `Enter the ${credit ? "amount owed" : "balance"} as a number in ${currency}` };
+  const balance = credit ? -entered : entered; // a credit card balance is money owed, so it is negative
+
+  const optMoney = (key: string): number | null | "bad" => {
+    const v = s(f, key);
+    if (!v) return null;
+    const m = money(v);
+    return m === null ? "bad" : m;
+  };
+  const day = (key: string): number | null | "bad" => {
+    const v = s(f, key);
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 1 && n <= 31 ? n : "bad";
+  };
+  let creditLimitMinor: number | null = null, minPaymentMinor: number | null = null, statementDay: number | null = null, dueDay: number | null = null, aprBps: number | null = null;
+  if (credit) {
+    const lim = optMoney("limit"), min = optMoney("minPayment"), st = day("statementDay"), due = day("dueDay");
+    if (lim === "bad") return { ok: false, error: `Credit limit must be a number in ${currency}` };
+    if (min === "bad") return { ok: false, error: `Minimum payment must be a number in ${currency}` };
+    if (st === "bad" || due === "bad") return { ok: false, error: "Statement and due days must be a day of the month, 1 to 31" };
+    creditLimitMinor = lim; minPaymentMinor = min; statementDay = st; dueDay = due;
+    if (s(f, "apr")) {
+      aprBps = parseAprBps(s(f, "apr"));
+      if (aprBps === null) return { ok: false, error: "Interest rate must be a percentage like 19.99" };
+    }
+  }
+  const last4 = s(f, "last4");
+  if (last4 && !/^\d{4}$/.test(last4)) return { ok: false, error: "Last 4 digits must be exactly 4 numbers" };
+
+  const fields = { name, kind, institution: s(f, "institution").slice(0, 60) || null, last4: last4 || null, creditLimitMinor, statementDay, dueDay, aprBps, minPaymentMinor };
+  if (!existing) {
+    await db.account.create({ data: { userId: u.id, currency, openingMinor: balance, ...fields } });
+  } else {
+    // Keep the transactions as they are: opening = what you say the balance is now, minus what they added up to.
+    const txns = await db.transaction.findMany({ where: { userId: u.id, OR: [{ accountId: existing.id }, { toAccountId: existing.id }] }, select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true } });
+    const { delta } = deltaFor(existing.id, currency, txns);
+    await db.account.update({ where: { id: existing.id }, data: { openingMinor: balance - delta, ...fields } });
+  }
+  revalidatePath("/accounts"); revalidatePath("/settings"); revalidatePath("/");
+  return { ok: true };
+}
+
+export async function setAccountArchived(id: string, archived: boolean) {
+  const u = await requireUser();
+  await db.account.updateMany({ where: { id, userId: u.id }, data: { archived } });
+  revalidatePath("/accounts"); revalidatePath("/");
 }
 
 export async function addCategory(f: FormData) {
