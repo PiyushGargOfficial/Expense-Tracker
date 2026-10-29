@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { login, register, googleLogin } from "@/app/actions";
 import { TOTP_REQUIRED } from "@/lib/authMessages";
 
@@ -16,6 +16,19 @@ export default function LoginForm({ googleEnabled }: { googleEnabled: boolean })
   // the code step carries these in hidden inputs instead of relying on the visible fields keeping their text.
   const [creds, setCreds] = useState<Creds | null>(null);
 
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // If the browser restores this page from its back/forward cache, wipe whatever was typed and any 2FA step.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      formRef.current?.reset();
+      setCreds(null);
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
+
   const isCodeResult = result?.startsWith(TOTP_REQUIRED) ?? false;
   const showCode = mode === "login" && isCodeResult && creds !== null;
   const codeError = isCodeResult && result!.length > TOTP_REQUIRED.length ? result!.slice(TOTP_REQUIRED.length + 1) : null;
@@ -24,8 +37,12 @@ export default function LoginForm({ googleEnabled }: { googleEnabled: boolean })
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
+    const form = e.currentTarget;
     if (mode === "login") setCreds({ email: String(data.get("email") ?? ""), password: String(data.get("password") ?? "") });
     startTransition(() => action(data));
+    // The values are captured above; don't leave the password sitting in the field while the request runs.
+    const pw = form.querySelector<HTMLInputElement>('input[type="password"]');
+    if (pw) pw.value = "";
   };
 
   return (
@@ -33,7 +50,7 @@ export default function LoginForm({ googleEnabled }: { googleEnabled: boolean })
       <h1 className="text-2xl font-bold">Expense Tracker</h1>
       <p className="text-muted">Track your spending. Split bills with friends.</p>
 
-      <form onSubmit={onSubmit} className="card flex flex-col gap-3">
+      <form ref={formRef} onSubmit={onSubmit} className="card flex flex-col gap-3">
         {showCode ? (
           <>
             <input type="hidden" name="email" value={creds.email} />

@@ -34,8 +34,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
-      // Authenticated pages and APIs must never be stored by shared caches or the service worker's HTTP layer.
-      { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      // Pages and APIs must never be stored by shared caches, and no-store also keeps browsers from restoring a page
+      // (typed email and password, or a signed-in screen after sign-out) from the back/forward cache.
+      // Hashed static assets are excluded so they stay cacheable.
+      { source: "/((?!_next/static|_next/image|icon.svg|favicon.ico|manifest.webmanifest|sw.js).*)", headers: [{ key: "Cache-Control", value: "no-store" }] },
     ];
   },
   turbopack: {
