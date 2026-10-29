@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --muted: #64748b;
+  --line: #e2e8f0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b1120;
+    --foreground: #e2e8f0;
+    --card: #131c31;
+    --muted: #94a3b8;
+    --line: #243049;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Stops iOS inflating text after rotation, and avoids sideways scroll from anything slightly too wide. */
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+/*
+ * Everything is sized in rem, so raising the root size scales the whole interface. A 27" monitor at 2560px
+ * would otherwise show tiny text on a huge canvas.
+ */
+@layer base {
+  html { @apply min-[1920px]:text-[18px] min-[2400px]:text-[20px]; }
+}
+
+@layer components {
+  .card { @apply min-w-0 rounded-xl border border-line bg-card p-4 sm:p-5; }
+  /* 16px text stops iOS zooming into a focused field; 44px height is the touch-target minimum. */
+  .input { @apply min-h-11 w-full min-w-0 rounded-lg border border-line bg-card px-3 py-2 text-base outline-none focus:ring-2 focus:ring-emerald-500; }
+  .btn { @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-50; }
+  .btn-ghost { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-line px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5 lg:min-h-9; }
+  .label { @apply mb-1 block text-sm text-muted; }
 }

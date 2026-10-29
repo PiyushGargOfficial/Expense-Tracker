@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Expense Tracker with Splitwise-style groups
 
-## Getting Started
+Next.js 16 + TypeScript + Prisma + Postgres. PWA with an offline write queue.
 
-First, run the development server:
+## Run it
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Create a free Postgres database (Neon or Supabase) and copy its connection strings.
+2. `cp .env.example .env` and set `DATABASE_URL`, `DIRECT_URL`, and `AUTH_SECRET` (`npx auth secret`).
+   Optional Google sign-in: set `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`
+   (redirect URI: `/api/auth/callback/google`).
+3. `npm install && npm run db:push && npm run dev`
+4. `npm test` runs the money, split and balance tests.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Free-tier deploy: Vercel (app) + Neon (database).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What is built (MVP)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Personal**: add/delete expense, income and transfers; accounts; categories and subcategories; monthly budgets
+with threshold alerts; recurring items (never posted automatically: tick the ones you paid and add them to expenses; highlighted when due soon); search, filter, sort;
+CSV import/export; reports (by category, month over month, top merchants); account deletion.
 
-## Learn More
+**Groups**: create groups, invite link, name-only members (claimable on join), equal / exact / percent / shares /
+itemized splits, single or multiple payers, per-group balances, simplified "who owes whom", partial settle-up
+(cash, Interac e-Transfer, bank transfer, cheque, PayPal), edit/delete (creator or admin, soft delete), audit log activity feed, comments.
 
-To learn more about Next.js, take a look at the following resources:
+**Offline**: new expenses and settlements are queued in IndexedDB and replayed through `/api/sync`; every op
+carries a `clientId`, so retries never duplicate. Visited pages are cached by the service worker.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Passwords: bcrypt (cost 12), 10 to 72 characters, common/numeric/email-derived passwords rejected.
+- Login: 5 failed attempts per email locks sign-in for 15 minutes; unknown emails cost the same bcrypt time and
+  get the same error message. Sign-ups limited to 5 per hour per IP. Sessions last 7 days.
+- Sign-up can no longer attach a password to an existing Google account (that was an account-takeover path).
+- No email confirmation: password sign-ups can sign in straight away, so the address is not proven to belong to
+  the person. To stop address squatting, when the real owner later signs in with Google (which does prove
+  ownership) any password set on that address beforehand is revoked, along with its 2FA.
+- Optional two-factor (TOTP, works with any authenticator app): secret encrypted at rest (AES-256-GCM),
+  a code can't be reused, 8 single-use recovery codes stored hashed, wrong codes count toward the login lockout,
+  and turning it off needs the password plus a code. Applies to password sign-in; Google accounts rely on Google.
+- Authorization: every group read/write checks membership, and expenses are always looked up together with
+  their group (`prisma/idor-check.ts` is a regression check for this).
+- Headers: CSP, HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy; `/api/*` is `no-store`.
+- Sync API: 50 ops and 1 MB per request, 120 requests per minute per user, all input validated with zod.
+- CSV export neutralises spreadsheet formulas; group invite codes are 144-bit random.
+- Sign-out clears the service-worker cache and the offline queue on that device.
 
-## Deploy on Vercel
+Known limits: the rate limiter is in-memory (use a shared store such as Upstash when deployed to serverless);
+a per-email lockout lets someone deliberately lock another person out for 15 minutes; 2FA covers password
+sign-in only and rotating `AUTH_SECRET` invalidates stored 2FA secrets; the CSP still allows inline scripts (needed by Next unless nonces are added).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Decisions
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Money is integer minor units everywhere. Uneven splits give leftover units to the payer first, and always sum exactly.
+- Multi-currency: each expense keeps its own currency. Balances, budgets and reports are per currency
+  (no silent conversion, so no wrong totals). Exchange-rate conversion is a v2 item.
+- Home and Groups are linked. Adding an expense on Home with a group picked creates a group expense paid by you
+  (default split "just me"; or equally with everyone; "More split options" opens the full form). Group expenses
+  entered in the group section count in your personal totals too.
+- The group expense is the single source of truth. Each member who has an account gets a personal row holding
+  THEIR SHARE (`Transaction.groupExpenseId`, kept in step by `lib/mirror.ts` on create, edit and delete), so Home
+  totals, reports, budgets, search and CSV export include it with no double counting. What you paid beyond your
+  share is not spending; it shows up under Budgets > "Lent out" until it is paid back. Settlements move money
+  between people and are not spending.
+- Those personal rows are managed from the group (Home shows "Open" instead of "Delete"). Other members never see
+  your personal data, only the group expense itself.
+- Existing data from before this link: run `npm run db:backfill` once (safe to repeat).
+- Balances are always recomputed from the ledger, so back-dated edits are correct automatically.
+
+## Not done yet (v2)
+
+Receipt photo upload/OCR, PDF export, email/push notifications and payment reminders, bank-statement parsing
+beyond the simple CSV format, natural-language entry, FX conversion, editing personal transactions,
+offline editing of existing records, full-text i18n.

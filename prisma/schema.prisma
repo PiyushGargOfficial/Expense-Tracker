@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  passwordHash    String?
+  image           String?
+  defaultCurrency String   @default("CAD")
+  createdAt       DateTime @default(now())
+
+  // Set only when Google proves ownership of the address. Password sign-ups leave it null (no email check).
+  emailVerified   DateTime?
+  // TOTP 2FA. The secret is AES-GCM encrypted at rest; it only counts once totpEnabled is true.
+  totpSecret      String?
+  totpEnabled     Boolean  @default(false)
+  totpLastStep    Int?     // last accepted 30s step, so a code can't be replayed
+  recoveryHashes  String[] // sha256 of unused one-time recovery codes
+
+  accounts   Account[]
+  categories Category[]
+  txns       Transaction[]
+  budgets    Budget[]
+  recurring  Recurring[]
+  members    Member[]
+}
+
+// ---------- Personal (private to the owner, never exposed to groups) ----------
+
+model Account {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  kind      AccountKind @default(CASH)
+  currency  String      @default("CAD")
+  txns      Transaction[] @relation("TxnAccount")
+  incoming  Transaction[] @relation("TxnToAccount")
+  archived  Boolean     @default(false)
+
+  @@index([userId])
+}
+
+enum AccountKind {
+  CASH
+  BANK
+  CARD
+  WALLET
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  icon      String?
+  parentId  String?
+  parent    Category?  @relation("CatTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CatTree")
+  txns      Transaction[]
+  budgets   Budget[]
+  recurring Recurring[]
+
+  @@unique([userId, name, parentId])
+}
+
+enum TxnType {
+  EXPENSE
+  INCOME
+  TRANSFER
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          TxnType
+  amountMinor   Int
+  currency      String
+  date          DateTime
+  note          String?
+  merchant      String?
+  paymentMethod String?
+  tags          String[]
+  receiptUrl    String?
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accountId     String?
+  account       Account?  @relation("TxnAccount", fields: [accountId], references: [id], onDelete: SetNull)
+  toAccountId   String?
+  toAccount     Account?  @relation("TxnToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
+  recurringId   String?
+  // Set when this row is the user's own share of a group expense. The group expense is the source of truth;
+  // this row is kept in step with it (see lib/mirror.ts), so totals, budgets and reports include group spending.
+  groupExpenseId String?
+  groupExpense   GroupExpense? @relation(fields: [groupExpenseId], references: [id], onDelete: Cascade)
+  // Client-generated id so offline retries never create duplicates.
+  clientId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, clientId])
+  @@unique([userId, groupExpenseId])
+  @@index([userId, date])
+}
+
+model Budget {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId  String? // null = overall monthly budget
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  limitMinor  Int
+  currency    String
+  alertAtPct  Int       @default(80)
+
+  @@unique([userId, categoryId, currency])
+}
+
+model Recurring {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        TxnType   @default(EXPENSE)
+  title       String
+  amountMinor Int
+  currency    String
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accountId   String?
+  frequency   Frequency
+  nextDate    DateTime
+  remindDays  Int       @default(1)
+  active      Boolean   @default(true)
+
+  @@index([userId, nextDate])
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY // every 2 weeks (14 days)
+  MONTHLY
+  YEARLY
+}
+
+// ---------- Groups (Splitwise-style) ----------
+
+model Group {
+  id              String   @id @default(cuid())
+  name            String
+  kind            String   @default("trip") // trip | flat | couple | other
+  defaultCurrency String   @default("CAD")
+  inviteCode      String   @unique @default(cuid())
+  createdAt       DateTime @default(now())
+  members         Member[]
+  expenses        GroupExpense[]
+  settlements     Settlement[]
+  audit           AuditLog[]
+}
+
+// A member may be a registered user or just a name (userId null).
+// A name-only member can later be claimed by a user joining via the invite link.
+model Member {
+  id       String  @id @default(cuid())
+  groupId  String
+  group    Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name     String
+  role     Role    @default(MEMBER)
+  email    String?
+  phone    String?
+  left     Boolean @default(false)
+
+  payers   ExpensePayer[]
+  shares   ExpenseShare[]
+  paid     Settlement[] @relation("SettleFrom")
+  received Settlement[] @relation("SettleTo")
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model GroupExpense {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  category    String?
+  amountMinor Int
+  currency    String
+  date        DateTime // back-dating is allowed; balances are always recomputed from the ledger
+  splitType   String
+  splitInput  Json // original user input, kept so the expense can be re-edited faithfully
+  createdById String
+  clientId    String?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payers   ExpensePayer[]
+  shares   ExpenseShare[]
+  comments Comment[]
+  mirrors  Transaction[]
+
+  @@unique([groupId, clientId])
+  @@index([groupId, date])
+}
+
+model ExpensePayer {
+  id          String       @id @default(cuid())
+  expenseId   String
+  expense     GroupExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      Member       @relation(fields: [memberId], references: [id])
+  paidMinor   Int
+}
+
+model ExpenseShare {
+  id          String       @id @default(cuid())
+  expenseId   String
+  expense     GroupExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      Member       @relation(fields: [memberId], references: [id])
+  owedMinor   Int
+}
+
+model Settlement {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromId      String
+  from        Member   @relation("SettleFrom", fields: [fromId], references: [id])
+  toId        String
+  to          Member   @relation("SettleTo", fields: [toId], references: [id])
+  amountMinor Int
+  currency    String
+  method      String   @default("cash") // cash | etransfer | bank | cheque | paypal | other (see lib/payment.ts)
+  date        DateTime @default(now())
+  note        String?
+  clientId    String?
+  deletedAt   DateTime?
+  createdById String
+
+  @@unique([groupId, clientId])
+  @@index([groupId])
+}
+
+model Comment {
+  id        String       @id @default(cuid())
+  expenseId String
+  expense   GroupExpense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  userId    String
+  userName  String
+  body      String
+  createdAt DateTime     @default(now())
+}
+
+// Append-only history: who did what, with before/after snapshots.
+model AuditLog {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  actorId   String
+  actorName String
+  action    String // expense.create | expense.update | expense.delete | settle | member.add ...
+  targetId  String?
+  summary   String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([groupId, createdAt])
+}
