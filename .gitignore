@@ -43,3 +43,6 @@ next-env.d.ts
 # keep the template tracked (real .env files stay ignored)
 !.env.example
 .neon
+
+.vercel
+.env*
