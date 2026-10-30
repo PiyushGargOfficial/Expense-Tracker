@@ -1,5 +1,5 @@
 // Split computation. Every function returns shares that sum EXACTLY to the total.
-import { minorToInput } from "@/lib/money";
+import { minorToInput } from "./money";
 
 export type SplitType = "EQUAL" | "EXACT" | "PERCENT" | "SHARES" | "ITEMIZED";
 
