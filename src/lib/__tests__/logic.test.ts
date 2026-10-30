@@ -82,3 +82,9 @@ describe("balances", () => {
     expect(simplify({ INR: { a: -100, b: 0, c: 100 } })).toHaveLength(1);
   });
 });
+
+describe("split error amounts", () => {
+  it("shows decimals when a currency is given", () => {
+    expect(() => computeShares(1431, { type: "EXACT", amounts: { a: 1331 } }, [], "CAD")).toThrow("Amounts add up to 13.31, expected 14.31");
+  });
+});

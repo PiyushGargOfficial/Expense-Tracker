@@ -82,8 +82,8 @@ async function groupMemberIds(groupId: string) {
 
 function buildLedger(d: z.infer<typeof groupExpenseSchema>, valid: Set<string>) {
   const payers = Object.fromEntries(Object.entries(d.payers).filter(([, v]) => v > 0));
-  validatePayers(d.amountMinor, payers);
-  const owed = computeShares(d.amountMinor, d.split as SplitInput, Object.keys(payers));
+  validatePayers(d.amountMinor, payers, d.currency);
+  const owed = computeShares(d.amountMinor, d.split as SplitInput, Object.keys(payers), d.currency);
   for (const id of [...Object.keys(payers), ...Object.keys(owed)]) if (!valid.has(id)) throw new Error("Unknown member in expense");
   return { payers, owed: Object.fromEntries(Object.entries(owed).filter(([, v]) => v > 0)) };
 }

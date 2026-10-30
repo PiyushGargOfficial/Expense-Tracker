@@ -1,4 +1,5 @@
 // Split computation. Every function returns shares that sum EXACTLY to the total.
+import { minorToInput } from "@/lib/money";
 
 export type SplitType = "EQUAL" | "EXACT" | "PERCENT" | "SHARES" | "ITEMIZED";
 
@@ -12,6 +13,9 @@ export type SplitInput =
   | { type: "ITEMIZED"; items: Item[] }; // tax/tip = total - sum(items), spread proportionally
 
 export class SplitError extends Error {}
+
+/** Amounts in messages are shown as the user typed them (12.50), not as minor units. */
+const fmt = (minor: number, currency?: string) => (currency ? minorToInput(minor, currency) : String(minor));
 
 /**
  * Distribute `total` by integer `weights`. Floors each part, then hands the
@@ -39,7 +43,7 @@ function priorityFor(ids: string[], payerIds: string[]): number[] {
 }
 
 /** Returns memberId -> owed minor units. `payerIds` only decides who absorbs leftover units. */
-export function computeShares(total: number, input: SplitInput, payerIds: string[] = []): Record<string, number> {
+export function computeShares(total: number, input: SplitInput, payerIds: string[] = [], currency?: string): Record<string, number> {
   const out: Record<string, number> = {};
   const fill = (ids: string[], parts: number[]) => ids.forEach((id, i) => (out[id] = (out[id] ?? 0) + parts[i]));
 
@@ -53,7 +57,7 @@ export function computeShares(total: number, input: SplitInput, payerIds: string
       const ids = Object.keys(input.amounts);
       if (ids.some((id) => !Number.isInteger(input.amounts[id]) || input.amounts[id] < 0)) throw new SplitError("Invalid amount");
       const sum = ids.reduce((a, id) => a + input.amounts[id], 0);
-      if (sum !== total) throw new SplitError(`Amounts add up to ${sum}, expected ${total}`);
+      if (sum !== total) throw new SplitError(`Amounts add up to ${fmt(sum, currency)}, expected ${fmt(total, currency)}`);
       return { ...input.amounts };
     }
     case "PERCENT": {
@@ -95,7 +99,7 @@ export function computeShares(total: number, input: SplitInput, payerIds: string
 }
 
 /** Paid amounts must sum to the total. A single payer is the common case. */
-export function validatePayers(total: number, paid: Record<string, number>): void {
+export function validatePayers(total: number, paid: Record<string, number>, currency?: string): void {
   const sum = Object.values(paid).reduce((a, b) => a + b, 0);
-  if (sum !== total) throw new SplitError(`Payments add up to ${sum}, expected ${total}`);
+  if (sum !== total) throw new SplitError(`Payments add up to ${fmt(sum, currency)}, expected ${fmt(total, currency)}`);
 }

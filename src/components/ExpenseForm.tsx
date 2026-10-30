@@ -77,7 +77,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
     else {
       split = { type: "ITEMIZED", items: items.map((it) => ({ amountMinor: parseToMinor(it.amount || "0", cur) ?? 0, memberIds: it.memberIds })).filter((i) => i.amountMinor > 0) };
     }
-    computeShares(total, split, Object.keys(payers)); // validates before we send anything
+    computeShares(total, split, Object.keys(payers), cur); // validates before we send anything
     return { payers, split };
   }
 
