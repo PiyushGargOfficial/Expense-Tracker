@@ -59,3 +59,41 @@ export function memberBalance(net: Net, memberId: string): Record<string, number
   for (const [cur, b] of Object.entries(net)) if (b[memberId]) out[cur] = b[memberId];
   return out;
 }
+
+export type PersonTotal = {
+  key: string;
+  name: string;
+  groups: string[];
+  /** currency -> minor units: what this person has lent me (I owe them) and what I have lent them. */
+  lentToMe: Record<string, number>;
+  iLent: Record<string, number>;
+};
+
+/** Same person in several groups = same name, ignoring case and extra spaces. */
+export function personKey(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Combine the simplified transfers of every group I am in into one total per person.
+ * Each group's transfers are what that group says is still unsettled between me and them.
+ */
+export function totalsByPerson(
+  groups: { name: string; meId: string; names: Record<string, string>; transfers: Transfer[] }[],
+): PersonTotal[] {
+  const people = new Map<string, PersonTotal>();
+  for (const g of groups) {
+    for (const t of g.transfers) {
+      const otherId = t.fromId === g.meId ? t.toId : t.toId === g.meId ? t.fromId : null;
+      if (!otherId) continue;
+      const name = (g.names[otherId] ?? "?").trim().replace(/\s+/g, " ");
+      const key = personKey(name);
+      const p = people.get(key) ?? { key, name, groups: [], lentToMe: {}, iLent: {} };
+      const bucket = t.fromId === g.meId ? p.lentToMe : p.iLent;
+      bucket[t.currency] = (bucket[t.currency] ?? 0) + t.amountMinor;
+      if (!p.groups.includes(g.name)) p.groups.push(g.name);
+      people.set(key, p);
+    }
+  }
+  return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
