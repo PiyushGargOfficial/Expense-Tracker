@@ -1,9 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { formatMinor } from "@/lib/money";
+import { CURRENCIES, formatMinor } from "@/lib/money";
 
-type SP = { q?: string; cat?: string; type?: string; sort?: string; from?: string; to?: string; group?: string };
+type SP = { q?: string; cat?: string; type?: string; sort?: string; from?: string; to?: string; group?: string; currency?: string };
 
 export default async function Transactions({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
@@ -13,8 +13,9 @@ export default async function Transactions({ searchParams }: { searchParams: Pro
   if (sp.cat) where.categoryId = sp.cat;
   if (sp.group === "none") where.groupExpenseId = null;
   else if (sp.group) where.groupExpense = { groupId: sp.group };
+  if (sp.currency) where.currency = sp.currency;
   if (sp.type) where.type = sp.type as "EXPENSE";
-  if (sp.from || sp.to) where.date = { ...(sp.from ? { gte: new Date(sp.from) } : {}), ...(sp.to ? { lte: new Date(sp.to) } : {}) };
+  if (sp.from || sp.to) where.date = { ...(sp.from ? { gte: new Date(sp.from) } : {}), ...(sp.to ? { lte: new Date(`${sp.to}T23:59:59.999Z`) } : {}) };
   const orderBy: Prisma.TransactionOrderByWithRelationInput = sp.sort === "amount" ? { amountMinor: "desc" } : sp.sort === "oldest" ? { date: "asc" } : { date: "desc" };
   const [txns, cats, groups] = await Promise.all([
     db.transaction.findMany({ where, orderBy, take: 200, include: { category: true, account: true, groupExpense: { select: { group: { select: { name: true } } } } } }),
@@ -30,6 +31,7 @@ export default async function Transactions({ searchParams }: { searchParams: Pro
         <select name="cat" defaultValue={sp.cat ?? ""} className="input" aria-label="Category"><option value="">All categories</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <select name="type" defaultValue={sp.type ?? ""} className="input" aria-label="Type"><option value="">All types</option><option value="EXPENSE">Expense</option><option value="INCOME">Income</option><option value="TRANSFER">Transfer</option></select>
         <select name="group" defaultValue={sp.group ?? ""} className="input col-span-2" aria-label="Group"><option value="">All (personal and group)</option><option value="none">Personal only</option>{groups.map((g) => <option key={g.id} value={g.id}>Group: {g.name}</option>)}</select>
+        <select name="currency" defaultValue={sp.currency ?? ""} className="input col-span-2" aria-label="Currency"><option value="">All currencies</option>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
         <input type="date" name="from" defaultValue={sp.from} className="input" aria-label="From" />
         <input type="date" name="to" defaultValue={sp.to} className="input" aria-label="To" />
         <select name="sort" defaultValue={sp.sort ?? ""} className="input" aria-label="Sort"><option value="">Newest first</option><option value="oldest">Oldest first</option><option value="amount">Largest first</option></select>

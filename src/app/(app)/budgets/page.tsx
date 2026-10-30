@@ -34,6 +34,13 @@ export default async function Budgets() {
   const used = (b: (typeof budgets)[number]) =>
     spent.filter((s) => s.currency === b.currency && (b.categoryId === null || s.categoryId === b.categoryId)).reduce((a, s) => a + (s._sum.amountMinor ?? 0), 0);
 
+  // Opens All transactions filtered to this budget: its category and currency, this month, largest first.
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const txnsHref = (b: (typeof budgets)[number]) => {
+    const q = new URLSearchParams({ type: "EXPENSE", currency: b.currency, from: day(start), to: day(new Date(+end - 1)), sort: "amount" });
+    if (b.categoryId) q.set("cat", b.categoryId);
+    return `/transactions?${q}`;
+  };
   return (
     <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Monthly budgets</h1>
@@ -49,7 +56,7 @@ export default async function Budgets() {
           return (
             <li key={b.id} className="card">
               <div className="flex flex-wrap items-center justify-between gap-y-1">
-                <span className="font-medium">{b.category?.name ?? "Overall"}</span>
+                <Link href={txnsHref(b)} className="font-medium underline-offset-2 hover:underline">{b.category?.name ?? "Overall"} <span aria-hidden className="text-muted">›</span></Link>
                 <BudgetEdit id={b.id} currency={b.currency} limitMinor={b.limitMinor} alertAtPct={b.alertAtPct}>
                   <form action={deleteBudget.bind(null, b.id)}><button className="-m-2 p-2 underline">Remove</button></form>
                 </BudgetEdit>
