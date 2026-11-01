@@ -18,9 +18,9 @@ describe("investments", () => {
     expect(p[0].totals.CAD.valueMinor).toBe(400);
   });
 
-  it("goal progress counts only linked holdings in the goal currency", () => {
+  it("goal progress counts the amount invested (not gains) in linked holdings of the goal currency", () => {
     const g = { id: "g1", targetMinor: 100000, currency: "CAD", targetDate: new Date(Date.UTC(2027, 0, 15)) };
-    const r = goalProgress(g, [h("A", "CAD", 0, 25000, "g1"), h("B", "USD", 0, 99999, "g1"), h("C", "CAD", 0, 5000, "other")], new Date(Date.UTC(2026, 9, 20)));
+    const r = goalProgress(g, [h("A", "CAD", 25000, 40000, "g1"), h("B", "USD", 99999, 99999, "g1"), h("C", "CAD", 5000, 5000, "other")], new Date(Date.UTC(2026, 9, 20)));
     expect(r.savedMinor).toBe(25000);
     expect(r.pct).toBe(25);
     expect(r.remainingMinor).toBe(75000);
@@ -30,8 +30,8 @@ describe("investments", () => {
 
   it("marks reached goals and passed deadlines", () => {
     const g = { id: "g", targetMinor: 1000, currency: "CAD", targetDate: new Date(Date.UTC(2020, 0, 1)) };
-    expect(goalProgress(g, [h("A", "CAD", 0, 1500, "g")]).reached).toBe(true);
-    const late = goalProgress(g, [h("A", "CAD", 0, 100, "g")], new Date(Date.UTC(2026, 0, 1)));
+    expect(goalProgress(g, [h("A", "CAD", 1500, 0, "g")]).reached).toBe(true);
+    const late = goalProgress(g, [h("A", "CAD", 100, 0, "g")], new Date(Date.UTC(2026, 0, 1)));
     expect(late.monthsLeft).toBe(0);
     expect(late.perMonthMinor).toBeNull();
   });

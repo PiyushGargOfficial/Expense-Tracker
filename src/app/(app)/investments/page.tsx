@@ -12,10 +12,13 @@ const fmtDate = (d: Date) => d.toLocaleDateString("en-CA", { year: "numeric", mo
 
 export default async function Investments() {
   const user = await requireUser();
-  const [holdings, goals] = await Promise.all([
+  const [holdings, goals, added] = await Promise.all([
     db.investment.findMany({ where: { userId: user.id }, orderBy: [{ platform: "asc" }, { name: "asc" }] }),
     db.investmentGoal.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
+    db.transaction.groupBy({ by: ["investmentId"], where: { userId: user.id, type: "INVEST", investmentId: { not: null } }, _sum: { amountMinor: true } }),
   ]);
+  // What came in through the Invest tab; the rest of the invested amount was already there.
+  const addedBy = (id: string) => added.find((a) => a.investmentId === id)?._sum.amountMinor ?? 0;
 
   const totals = totalsByCurrency(holdings);
   const platforms = totalsByPlatform(holdings);
@@ -137,6 +140,9 @@ export default async function Investments() {
                       <div><div className="text-xs text-muted">Value</div>{formatMinor(h.valueMinor, h.currency)}</div>
                       <div><div className="text-xs text-muted">Gain / loss</div><span className={gainClass(gain)}>{signed(gain, h.currency)}</span></div>
                     </div>
+                    {addedBy(h.id) > 0 && (
+                      <p className="mt-1 text-xs text-muted">Already invested {formatMinor(Math.max(0, h.investedMinor - addedBy(h.id)), h.currency)} · added with the Invest tab {formatMinor(addedBy(h.id), h.currency)}</p>
+                    )}
                     {h.note && <p className="mt-1 text-xs text-muted">{h.note}</p>}
                   </li>
                 );

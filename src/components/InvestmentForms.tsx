@@ -62,8 +62,8 @@ export function InvestmentForm({ investment, defaultCurrency, platforms, goals, 
         </select>
       </div>
       <div>
-        <label className="label" htmlFor={`inv-${id}`}>Amount invested</label>
-        <input id={`inv-${id}`} name="invested" inputMode="decimal" className="input" defaultValue={investment ? minorToInput(investment.investedMinor, cur) : ""} placeholder="0.00" onChange={clear} />
+        <label className="label" htmlFor={`inv-${id}`}>Already invested</label>
+        <input id={`inv-${id}`} name="invested" inputMode="decimal" className="input" defaultValue={investment ? minorToInput(investment.investedMinor, cur) : ""} placeholder="What you have put in so far" onChange={clear} />
       </div>
       <div>
         <label className="label" htmlFor={`val-${id}`}>Current value</label>
@@ -73,7 +73,7 @@ export function InvestmentForm({ investment, defaultCurrency, platforms, goals, 
         <label className="label" htmlFor={`note-${id}`}>Note (optional)</label>
         <input id={`note-${id}`} name="note" className="input" defaultValue={investment?.note ?? ""} maxLength={300} onChange={clear} />
       </div>
-      <p className="col-span-2 text-xs text-muted">Amount invested is what you put in; current value is what it is worth today. Update the value whenever you check your platform.</p>
+      <p className="col-span-2 text-xs text-muted">Already invested is everything you have put in so far, including before you started using this app. Current value is what it is worth today; leave it blank if it is the same. Later contributions from the Invest tab on Home are added to both automatically.</p>
       {error && <p role="alert" className="col-span-2 text-sm text-red-600">{error}</p>}
       {saved && <p role="status" className="col-span-2 text-sm text-emerald-600">Investment added.</p>}
       <div className="col-span-2 flex gap-2">
@@ -130,7 +130,7 @@ export function GoalForm({ goal, defaultCurrency, onDone }: { goal?: GoalValues;
         <label className="label" htmlFor={`gnote-${id}`}>Note (optional)</label>
         <input id={`gnote-${id}`} name="note" className="input" defaultValue={goal?.note ?? ""} maxLength={300} onChange={clear} />
       </div>
-      <p className="col-span-2 text-xs text-muted">Progress is the current value of the investments you link to this goal (same currency).</p>
+      <p className="col-span-2 text-xs text-muted">Progress is the amount you have invested in the investments linked to this goal (same currency). Gains and losses are not counted.</p>
       {error && <p role="alert" className="col-span-2 text-sm text-red-600">{error}</p>}
       {saved && <p role="status" className="col-span-2 text-sm text-emerald-600">Goal added.</p>}
       <div className="col-span-2 flex gap-2">

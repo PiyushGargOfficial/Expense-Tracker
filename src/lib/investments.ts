@@ -55,9 +55,9 @@ export function totalsByPlatform(holdings: Holding[]) {
 
 export type GoalInput = { id: string; targetMinor: number; currency: string; targetDate: Date | null };
 
-/** Progress of a goal from the current value of the holdings linked to it (same currency only). */
+/** Progress of a goal from the amount invested in the holdings linked to it (same currency only). Gains do not count. */
 export function goalProgress(goal: GoalInput, holdings: Holding[], today = new Date()) {
-  const savedMinor = holdings.filter((h) => h.goalId === goal.id && h.currency === goal.currency).reduce((a, h) => a + h.valueMinor, 0);
+  const savedMinor = holdings.filter((h) => h.goalId === goal.id && h.currency === goal.currency).reduce((a, h) => a + h.investedMinor, 0);
   const remainingMinor = Math.max(0, goal.targetMinor - savedMinor);
   const pct = goal.targetMinor > 0 ? Math.floor((savedMinor / goal.targetMinor) * 100) : 0;
   let monthsLeft: number | null = null;
