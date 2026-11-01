@@ -21,7 +21,7 @@ CSV import/export; reports (by category, month over month, top merchants); accou
 
 **Accounts**: balance per account (starting balance plus recorded transactions, per currency), and for credit
 cards the amount owed, limit, available credit, utilisation, statement and payment due dates, minimum payment,
-interest rate, and what was paid since the last statement. Cards due within 7 days are flagged.
+interest rate, and what was paid since the last statement. The amount owed is calculated from the starting balance and recorded transactions; editing it can raise it but never lower it (record a payment instead). Cards due within 7 days are flagged.
 
 **Investments**: holdings on each platform (Wealthsimple, Questrade, crypto, GICs…) with amount invested, current value
 and gain or loss, totals per platform and currency, and goals with progress, amount to go and the monthly amount needed

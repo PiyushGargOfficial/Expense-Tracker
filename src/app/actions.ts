@@ -7,7 +7,7 @@ import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { requireUser, requireMember } from "@/lib/session";
-import { CURRENCIES, parseToMinor } from "@/lib/money";
+import { CURRENCIES, formatPlain, parseToMinor } from "@/lib/money";
 import { KIND_VALUES, deltaFor, parseAprBps, parseSigned, type AccountKindValue } from "@/lib/accounts";
 import { deleteGroupExpense, deleteSettlement, updateGroupExpense } from "@/lib/ops";
 import { parseCsv } from "@/lib/csv";
@@ -154,6 +154,12 @@ export async function saveAccount(id: string | null, f: FormData): Promise<SaveR
     // Keep the transactions as they are: opening = what you say the balance is now, minus what they added up to.
     const txns = await db.transaction.findMany({ where: { userId: u.id, OR: [{ accountId: existing.id }, { toAccountId: existing.id }] }, select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true } });
     const { delta } = deltaFor(existing.id, currency, txns);
+    // The amount owed on a card is calculated from its starting balance and the recorded transactions. It can be
+    // raised (fees, interest), but not lowered by editing: pay it down by recording a payment.
+    const calculatedOwed = Math.max(0, -(existing.openingMinor + delta));
+    if (existing.kind === "CREDIT" && credit && -balance < calculatedOwed) {
+      return { ok: false, error: `The amount owed can't be lower than the calculated ${formatPlain(calculatedOwed, currency)}. To reduce it, record a payment to this card.` };
+    }
     await db.account.update({ where: { id: existing.id }, data: { openingMinor: balance - delta, ...fields } });
   }
   revalidatePath("/accounts"); revalidatePath("/settings"); revalidatePath("/");

@@ -50,6 +50,7 @@ export default async function Accounts() {
   const values = (r: (typeof rows)[number]): AccountValues => ({
     id: r.a.id, name: r.a.name, kind: r.a.kind, currency: r.a.currency, institution: r.a.institution, last4: r.a.last4, balance: r.balance,
     creditLimitMinor: r.a.creditLimitMinor, statementDay: r.a.statementDay, dueDay: r.a.dueDay, aprBps: r.a.aprBps, minPaymentMinor: r.a.minPaymentMinor,
+    minOwedMinor: r.a.kind === "CREDIT" ? Math.max(0, -r.balance) : undefined,
   });
 
   return (

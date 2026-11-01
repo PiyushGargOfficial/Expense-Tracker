@@ -2,12 +2,14 @@
 import { useRef, useState, useTransition } from "react";
 import { saveAccount } from "@/app/actions";
 import { ACCOUNT_KINDS } from "@/lib/accounts";
-import { CURRENCIES, minorToInput } from "@/lib/money";
+import { CURRENCIES, formatPlain, minorToInput, parseToMinor } from "@/lib/money";
 import CadHint from "@/components/CadHint";
 
 export type AccountValues = {
   id: string; name: string; kind: string; currency: string; institution: string | null; last4: string | null;
   balance: number; creditLimitMinor: number | null; statementDay: number | null; dueDay: number | null; aprBps: number | null; minPaymentMinor: number | null;
+  /** Credit cards: the owed amount calculated from the recorded transactions. Editing can't go below it. */
+  minOwedMinor?: number;
 };
 
 /** Add an account (no `account`) or edit one. Credit cards get their own fields: limit, statement and due days, rate, minimum. */
@@ -26,6 +28,8 @@ export default function AccountForm({ account, defaultCurrency, onDone }: { acco
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
+    const owed = account?.kind === "CREDIT" && kind === "CREDIT" ? parseToMinor(String(data.get("balance") || "0"), cur) : null;
+    if (owed !== null && owed < (account?.minOwedMinor ?? 0)) { setError(`The amount owed can't be lower than the calculated ${formatPlain(account?.minOwedMinor ?? 0, cur)}. To reduce it, record a payment to this card.`); return; }
     start(async () => {
       const r = await saveAccount(account?.id ?? null, data);
       if (!r.ok) { setError(r.error); setSaved(false); return; }
@@ -65,6 +69,9 @@ export default function AccountForm({ account, defaultCurrency, onDone }: { acco
       <div className="col-span-2">
         <label className="label" htmlFor={`bal-${id}`}>{credit ? "Amount owed now" : "Current balance"} ({cur})</label>
         <input id={`bal-${id}`} name="balance" inputMode="decimal" className="input" defaultValue={initialBalance} placeholder="0.00" onChange={clear} />
+        {credit && account?.kind === "CREDIT" && (account.minOwedMinor ?? 0) > 0 && (
+          <p className="mt-1 text-xs text-muted">Calculated from your transactions: {formatPlain(account.minOwedMinor ?? 0, cur)}. You can raise it (fees, interest) but not lower it; to reduce it, record a payment to this card.</p>
+        )}
         <CadHint amountName="balance" currency={account ? cur : undefined} className="mt-1" />
       </div>
 
