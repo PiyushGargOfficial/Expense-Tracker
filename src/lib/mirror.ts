@@ -42,7 +42,8 @@ export async function syncMirrors(c: Client, expenseId: string, hints?: Personal
         date: e.date,
         note: mine?.note || e.title,
         ...(categoryId ? { categoryId } : {}),
-        ...(accountId ? { accountId } : {}),
+        // An explicit null from the form means "not specified": clear the account the person chose earlier.
+        ...(accountId ? { accountId } : mine?.accountId === null ? { accountId: null } : {}),
         ...(mine?.paymentMethod ? { paymentMethod: mine.paymentMethod } : {}),
       },
       create: {

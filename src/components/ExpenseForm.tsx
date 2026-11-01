@@ -16,6 +16,7 @@ type Initial = {
   category: string | null;
   payers: Record<string, number>;
   split: SplitInput;
+  accountId?: string | null;
 };
 type Tab = "EQUAL" | "EXACT" | "PERCENT" | "SHARES" | "ITEMIZED";
 type ItemRow = { amount: string; memberIds: string[] };
@@ -28,7 +29,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "ITEMIZED", label: "By item" },
 ];
 
-export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [] }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[] }) {
+export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [] }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[] }) {
   const router = useRouter();
   const all = members.map((m) => m.id);
   const init = initial?.split;
@@ -52,6 +53,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
   const [items, setItems] = useState<ItemRow[]>(init?.type === "ITEMIZED" ? init.items.map((i) => ({ amount: minorToInput(i.amountMinor, initCur), memberIds: i.memberIds })) : [{ amount: "", memberIds: all }]);
 
   const [categoryId, setCategoryId] = useState(() => categories.find((c) => c.name.toLowerCase() === (initial?.category ?? "").toLowerCase())?.id ?? "");
+  const [accountId, setAccountId] = useState(initial?.accountId ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const total = parseToMinor(amount, cur);
@@ -94,7 +96,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
     setBusy(true);
     const catName = categories.find((c) => c.id === categoryId)?.name ?? null;
     // `personal` lets your own share land in your Home totals under the category you picked.
-    const data = { title: title.trim(), category: catName, amountMinor: total!, currency: cur, date, payers: built.payers, split: built.split, personal: { categoryId: categoryId || null } };
+    const data = { title: title.trim(), category: catName, amountMinor: total!, currency: cur, date, payers: built.payers, split: built.split, personal: { categoryId: categoryId || null, accountId: accountId || null, paymentMethod: accounts.find((a) => a.id === accountId)?.name ?? null } };
     try {
       if (initial) {
         await editExpense(groupId, initial.expenseId, data);
@@ -127,6 +129,15 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
           <option value="">No category</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+      )}
+      {accounts.length > 0 && (
+        <div>
+          <select className="input" aria-label="Paid with" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Paid with: not specified</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <p className="mt-1 text-xs text-muted">Only you see this. Your share is recorded against this account (cash, a card…).</p>
+        </div>
       )}
 
       <fieldset className="card space-y-2">

@@ -14,6 +14,10 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
   const e = await db.groupExpense.findFirst({ where: { id: eid, groupId: id, deletedAt: null }, include: { payers: true, shares: true, comments: { orderBy: { createdAt: "asc" } } } });
   if (!e) notFound();
   const categories = await db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const [accounts, mine] = await Promise.all([
+    db.account.findMany({ where: { userId: user.id, archived: false }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.transaction.findFirst({ where: { userId: user.id, groupExpenseId: e.id }, select: { accountId: true } }),
+  ]);
   const nm = (mid: string) => group.members.find((m) => m.id === mid)?.name ?? "?";
   const canEdit = e.createdById === user.id || me.role === "ADMIN";
 
@@ -52,6 +56,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
               members={group.members.filter((m) => !m.left || e.shares.some((s) => s.memberId === m.id) || e.payers.some((p) => p.memberId === m.id)).map((m) => ({ id: m.id, name: m.name }))}
               defaultCurrency={group.defaultCurrency}
               categories={categories}
+              accounts={accounts}
               initial={{
                 expenseId: e.id,
                 title: e.title,
@@ -61,6 +66,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
                 category: e.category,
                 payers: Object.fromEntries(e.payers.map((p) => [p.memberId, p.paidMinor])),
                 split: e.splitInput as unknown as SplitInput,
+                accountId: mine?.accountId ?? null,
               }}
             />
           </section>
