@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { formatMinor } from "@/lib/money";
 import { assetLabel, goalProgress, platformKey, totalsByCurrency, totalsByPlatform, type Totals } from "@/lib/investments";
 import { deleteGoal, deleteInvestment } from "@/app/actions";
+import { deltaFor, type AcctTxn } from "@/lib/accounts";
 import { GoalEdit, GoalForm, InvestmentEdit, InvestmentForm, type GoalValues, type InvestmentValues } from "@/components/InvestmentForms";
 
 const gainClass = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-red-600" : "");
@@ -12,11 +14,20 @@ const fmtDate = (d: Date) => d.toLocaleDateString("en-CA", { year: "numeric", mo
 
 export default async function Investments() {
   const user = await requireUser();
-  const [holdings, goals, added] = await Promise.all([
+  const [holdings, goals, added, chequing, acctTxns] = await Promise.all([
     db.investment.findMany({ where: { userId: user.id }, orderBy: [{ platform: "asc" }, { name: "asc" }] }),
     db.investmentGoal.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
     db.transaction.groupBy({ by: ["investmentId"], where: { userId: user.id, type: "INVEST", investmentId: { not: null } }, _sum: { amountMinor: true } }),
+    db.account.findMany({ where: { userId: user.id, kind: "BANK", archived: false }, orderBy: { name: "asc" } }),
+    db.transaction.findMany({
+      where: { userId: user.id, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
+      select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true },
+    }),
   ]);
+  // Net deposits: what is sitting in your chequing accounts right now (starting balance plus recorded transactions).
+  const deposits = chequing.map((a) => ({ a, balance: a.openingMinor + deltaFor(a.id, a.currency, acctTxns satisfies AcctTxn[]).delta }));
+  const depositTotals: Record<string, number> = {};
+  for (const d of deposits) depositTotals[d.a.currency] = (depositTotals[d.a.currency] ?? 0) + d.balance;
   // What came in through the Invest tab; the rest of the invested amount was already there.
   const addedBy = (id: string) => added.find((a) => a.investmentId === id)?._sum.amountMinor ?? 0;
 
@@ -51,6 +62,25 @@ export default async function Investments() {
           ))
         )}
         <p className="text-xs text-muted">Values are the ones you enter, so update them when you check your platform. Each currency is shown separately.</p>
+      </section>
+
+      <section className="card lg:col-span-2" aria-label="Net deposits">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-semibold">Net deposits</h2>
+          <Link href="/accounts" className="-m-2 p-2 text-xs underline">Accounts</Link>
+        </div>
+        {deposits.length === 0 ? (
+          <p className="text-sm text-muted">No chequing accounts yet. Add one under Accounts with the type Chequing / bank.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-x-6">
+              {Object.entries(depositTotals).map(([cur, v]) => <div key={cur} className={`text-xl font-semibold ${v < 0 ? "text-red-600" : ""}`}>{formatMinor(v, cur)}</div>)}
+            </div>
+            <p className="text-xs text-muted">
+              Total across {deposits.length} chequing account{deposits.length === 1 ? "" : "s"}: {deposits.map((d) => `${d.a.name} ${formatMinor(d.balance, d.a.currency)}`).join(" · ")}. Money you invest from them comes off the balance.
+            </p>
+          </>
+        )}
       </section>
 
       {platforms.length > 0 && (
