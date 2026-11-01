@@ -23,6 +23,10 @@ CSV import/export; reports (by category, month over month, top merchants); accou
 cards the amount owed, limit, available credit, utilisation, statement and payment due dates, minimum payment,
 interest rate, and what was paid since the last statement. Cards due within 7 days are flagged.
 
+**Investments**: holdings on each platform (Wealthsimple, Questrade, crypto, GICs…) with amount invested, current value
+and gain or loss, totals per platform and currency, and goals with progress, amount to go and the monthly amount needed
+by the target date. Private to you. Values are entered by hand.
+
 **Groups**: create groups, invite link, name-only members (claimable on join), equal / exact / percent / shares /
 itemized splits, single or multiple payers, per-group balances, simplified "who owes whom", partial settle-up
 (cash, Interac e-Transfer, bank transfer, cheque, PayPal), edit/delete (creator or admin, soft delete), audit log activity feed, comments.

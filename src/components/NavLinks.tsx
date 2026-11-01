@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = [
+const NAV: { href: string; label: string; short?: string; d: string }[] = [
   { href: "/", label: "Home", d: "M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V11z" },
   { href: "/groups", label: "Groups", d: "M16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zM8 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm0 2c-2.7 0-6 1.3-6 4v2h12v-2c0-2.7-3.3-4-6-4zm8 0c-.4 0-.8 0-1.2.1 1.2.9 2.2 2.1 2.2 3.9v2h7v-2c0-2.7-3.3-4-8-4z" },
   { href: "/accounts", label: "Accounts", d: "M3 6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6zm0 4h18M7 15h4" },
+  { href: "/investments", label: "Investments", short: "Invest", d: "M3 17l6-6 4 4 8-8M15 7h6v6" },
   { href: "/reports", label: "Reports", d: "M4 20V10m6 10V4m6 16v-7m6 7H2" },
   { href: "/budgets", label: "Budgets", d: "M12 3a9 9 0 1 0 9 9h-9V3zm2 0v7h7a7 7 0 0 0-7-7z" },
   { href: "/recurring", label: "Recurring", d: "M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14 3v2a3 3 0 0 1-3 3H3" },
@@ -33,7 +34,7 @@ export default function NavLinks({ variant }: { variant: "bottom" | "side" }) {
             <Link href={n.href} aria-current={active(n.href) ? "page" : undefined}
               className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] ${active(n.href) ? "font-semibold text-emerald-600" : "text-muted"}`}>
               <Icon d={n.d} />
-              {n.label}
+              {n.short ?? n.label}
             </Link>
           </li>
         ))}

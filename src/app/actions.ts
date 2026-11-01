@@ -19,6 +19,7 @@ import { syncGroupMirrors } from "@/lib/mirror";
 import { addRecurringToExpenses } from "@/lib/recurring";
 import { TOTP_REQUIRED } from "@/lib/authMessages";
 import { passwordProblem } from "@/lib/password";
+import { ASSET_VALUES } from "@/lib/investments";
 
 const DEFAULT_CATEGORIES = ["Food", "Groceries", "Transport", "Rent", "Bills", "Shopping", "Health", "Travel", "Entertainment", "Other"];
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -154,6 +155,71 @@ export async function setAccountArchived(id: string, archived: boolean) {
   const u = await requireUser();
   await db.account.updateMany({ where: { id, userId: u.id }, data: { archived } });
   revalidatePath("/accounts"); revalidatePath("/");
+}
+
+// ---------- investments (private to the signed-in user) ----------
+
+export async function saveInvestment(id: string | null, f: FormData): Promise<SaveResult> {
+  const u = await requireUser();
+  const platform = s(f, "platform").replace(/\s+/g, " ").slice(0, 60);
+  const name = s(f, "name").slice(0, 80);
+  if (!platform) return { ok: false, error: "Enter the platform, like Wealthsimple or Questrade" };
+  if (!name) return { ok: false, error: "Give the investment a name" };
+  const assetType = s(f, "assetType") || "OTHER";
+  if (!ASSET_VALUES.includes(assetType)) return { ok: false, error: "Pick a type" };
+  const existing = id ? await db.investment.findFirst({ where: { id, userId: u.id } }) : null;
+  if (id && !existing) return { ok: false, error: "Investment not found" };
+  const currency = existing ? existing.currency : s(f, "currency") || u.defaultCurrency;
+  if (!(CURRENCIES as readonly string[]).includes(currency)) return { ok: false, error: "Unknown currency" };
+  const investedMinor = parseToMinor(s(f, "invested") || "0", currency);
+  if (investedMinor === null) return { ok: false, error: `Amount invested must be a number in ${currency}` };
+  const valueMinor = s(f, "value") ? parseToMinor(s(f, "value"), currency) : investedMinor;
+  if (valueMinor === null) return { ok: false, error: `Current value must be a number in ${currency}` };
+  const goalId = s(f, "goalId") || null;
+  if (goalId) {
+    const goal = await db.investmentGoal.findFirst({ where: { id: goalId, userId: u.id } });
+    if (!goal) return { ok: false, error: "Goal not found" };
+    if (goal.currency !== currency) return { ok: false, error: `That goal is in ${goal.currency}; this investment is in ${currency}` };
+  }
+  const data = { platform, name, assetType, investedMinor, valueMinor, goalId, note: s(f, "note").slice(0, 300) || null };
+  if (existing) await db.investment.update({ where: { id: existing.id }, data });
+  else await db.investment.create({ data: { ...data, userId: u.id, currency } });
+  revalidatePath("/investments");
+  return { ok: true };
+}
+
+export async function deleteInvestment(id: string) {
+  const u = await requireUser();
+  await db.investment.deleteMany({ where: { id, userId: u.id } });
+  revalidatePath("/investments");
+}
+
+export async function saveGoal(id: string | null, f: FormData): Promise<SaveResult> {
+  const u = await requireUser();
+  const name = s(f, "name").slice(0, 80);
+  if (!name) return { ok: false, error: "Give the goal a name" };
+  const existing = id ? await db.investmentGoal.findFirst({ where: { id, userId: u.id } }) : null;
+  if (id && !existing) return { ok: false, error: "Goal not found" };
+  const currency = existing ? existing.currency : s(f, "currency") || u.defaultCurrency;
+  if (!(CURRENCIES as readonly string[]).includes(currency)) return { ok: false, error: "Unknown currency" };
+  const targetMinor = parseToMinor(s(f, "target"), currency);
+  if (!targetMinor) return { ok: false, error: `Enter the target amount as a number in ${currency}` };
+  let targetDate: Date | null = null;
+  if (s(f, "targetDate")) {
+    targetDate = new Date(`${s(f, "targetDate")}T00:00:00.000Z`);
+    if (Number.isNaN(+targetDate)) return { ok: false, error: "Enter a valid target date" };
+  }
+  const data = { name, targetMinor, targetDate, note: s(f, "note").slice(0, 300) || null };
+  if (existing) await db.investmentGoal.update({ where: { id: existing.id }, data });
+  else await db.investmentGoal.create({ data: { ...data, userId: u.id, currency } });
+  revalidatePath("/investments");
+  return { ok: true };
+}
+
+export async function deleteGoal(id: string) {
+  const u = await requireUser();
+  await db.investmentGoal.deleteMany({ where: { id, userId: u.id } }); // holdings stay, just unlinked
+  revalidatePath("/investments");
 }
 
 export async function addCategory(f: FormData) {

@@ -31,6 +31,8 @@ model User {
   budgets    Budget[]
   recurring  Recurring[]
   members    Member[]
+  investments Investment[]
+  goals      InvestmentGoal[]
 }
 
 // ---------- Personal (private to the owner, never exposed to groups) ----------
@@ -163,6 +165,41 @@ enum Frequency {
   BIWEEKLY // every 2 weeks (14 days)
   MONTHLY
   YEARLY
+}
+
+// ---------- Investments (private to the owner) ----------
+
+// One holding on one platform: what was put in and what it is worth now. Both are entered by the user.
+model Investment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform    String // Wealthsimple, Questrade… (holdings with the same name, ignoring case, are grouped)
+  name        String
+  assetType   String   @default("OTHER") // TFSA | RRSP | FHSA | RESP | NONREG | CRYPTO | GIC | REALESTATE | OTHER
+  currency    String
+  investedMinor Int    @default(0)
+  valueMinor  Int      @default(0)
+  note        String?
+  goalId      String?
+  goal        InvestmentGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model InvestmentGoal {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  targetMinor Int
+  currency    String
+  targetDate  DateTime?
+  note        String?
+  holdings    Investment[]
+
+  @@index([userId])
 }
 
 // ---------- Groups (Splitwise-style) ----------
