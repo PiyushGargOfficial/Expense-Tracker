@@ -5,6 +5,7 @@ import { newClientId, submitOp } from "@/lib/outbox";
 import { CURRENCIES, minorToInput, parseToMinor } from "@/lib/money";
 import { computeShares, SplitError, type SplitInput } from "@/lib/split";
 import { editExpense } from "@/app/actions";
+import { CadAmountHint } from "@/components/CadHint";
 
 type M = { id: string; name: string };
 type Initial = {
@@ -123,6 +124,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
         <input className="input text-xl font-semibold" inputMode="decimal" placeholder="0.00" aria-label="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
         <select className="input w-24" aria-label="Currency" value={cur} onChange={(e) => setCur(e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
       </div>
+      <CadAmountHint amount={amount} currency={cur} />
       <input type="date" className="input" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
       {categories.length > 0 && (
         <select className="input" aria-label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>

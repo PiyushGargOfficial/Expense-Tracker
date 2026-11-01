@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { loadRates } from "@/lib/fxServer";
 
 /** Current user or redirect to login. Used by every server action and page. */
 export async function requireUser() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  const user = await db.user.findUnique({ where: { id: session.user.id } });
+  const [user] = await Promise.all([db.user.findUnique({ where: { id: session.user.id } }), loadRates()]);
   if (!user) redirect("/login");
   return user;
 }

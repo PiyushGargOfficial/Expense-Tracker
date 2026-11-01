@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { parseToMinor, CURRENCIES } from "@/lib/money";
+import { CadAmountHint } from "@/components/CadHint";
 
 type Opt = { id: string; name: string };
 export type GroupOpt = { id: string; name: string; meId: string; memberIds: string[]; currency: string };
@@ -89,6 +90,7 @@ export default function QuickAdd({ categories, accounts, currency, groups, holdi
           {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
         </select>
       </div>
+      <CadAmountHint amount={amount} currency={cur} />
 
       {type !== "TRANSFER" && !invest && (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Category">

@@ -1,4 +1,5 @@
 // All amounts are integers in minor units (paise, cents). Never floats.
+import { toCadMinor } from "./fx";
 
 const ZERO_DECIMAL = new Set(["JPY", "KRW", "VND", "CLP", "ISK", "UGX"]);
 const THREE_DECIMAL = new Set(["KWD", "BHD", "OMR", "JOD", "TND"]);
@@ -22,7 +23,8 @@ export function parseToMinor(input: string, currency: string): number | null {
   return Number.isSafeInteger(minor) ? minor : null;
 }
 
-export function formatMinor(minor: number, currency: string, locale?: string): string {
+/** The amount in its own currency only. */
+export function formatPlain(minor: number, currency: string, locale?: string): string {
   const d = decimalsFor(currency);
   return new Intl.NumberFormat(locale, {
     style: "currency",
@@ -30,6 +32,19 @@ export function formatMinor(minor: number, currency: string, locale?: string): s
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   }).format(minor / 10 ** d);
+}
+
+/** "CA$16.50", always marked as Canadian dollars so it is never mistaken for US dollars. */
+export function formatCad(cadMinor: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "CAD", currencyDisplay: "symbol" }).format(cadMinor / 100);
+}
+
+/** The amount, plus its Canadian-dollar equivalent in brackets when the currency is not CAD: "₹1,000.00 (≈ CA$16.67)". */
+export function formatMinor(minor: number, currency: string, locale?: string): string {
+  const plain = formatPlain(minor, currency, locale);
+  if (currency === "CAD") return plain;
+  const cad = toCadMinor(minor, currency);
+  return cad === null ? plain : `${plain} (≈ ${formatCad(cad)})`;
 }
 
 /** Minor units -> plain editable string, e.g. 45050 -> "450.50" */

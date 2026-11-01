@@ -3,6 +3,7 @@ import { useRef, useState, useTransition } from "react";
 import { saveAccount } from "@/app/actions";
 import { ACCOUNT_KINDS } from "@/lib/accounts";
 import { CURRENCIES, minorToInput } from "@/lib/money";
+import CadHint from "@/components/CadHint";
 
 export type AccountValues = {
   id: string; name: string; kind: string; currency: string; institution: string | null; last4: string | null;
@@ -64,6 +65,7 @@ export default function AccountForm({ account, defaultCurrency, onDone }: { acco
       <div className="col-span-2">
         <label className="label" htmlFor={`bal-${id}`}>{credit ? "Amount owed now" : "Current balance"} ({cur})</label>
         <input id={`bal-${id}`} name="balance" inputMode="decimal" className="input" defaultValue={initialBalance} placeholder="0.00" onChange={clear} />
+        <CadHint amountName="balance" currency={account ? cur : undefined} className="mt-1" />
       </div>
 
       {credit && (

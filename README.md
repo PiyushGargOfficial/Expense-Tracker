@@ -82,3 +82,7 @@ sign-in only and rotating `AUTH_SECRET` invalidates stored 2FA secrets; the CSP 
 Receipt photo upload/OCR, PDF export, email/push notifications and payment reminders, bank-statement parsing
 beyond the simple CSV format, natural-language entry, FX conversion, editing personal transactions,
 offline editing of existing records, full-text i18n.
+
+**Other currencies**: any amount in a currency other than CAD shows its Canadian-dollar equivalent in brackets, and forms
+show the equivalent and the current rate as you type. Rates come from open.er-api.com (cached for 6 hours, with built-in
+approximations if the service is down) and are for display only: nothing is converted or added across currencies.

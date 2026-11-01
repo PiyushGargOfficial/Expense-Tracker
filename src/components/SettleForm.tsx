@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
-import { formatMinor, minorToInput, parseToMinor } from "@/lib/money";
+import { formatPlain, minorToInput, parseToMinor } from "@/lib/money";
 import { PAYMENT_METHODS } from "@/lib/payment";
 
 /**
@@ -26,7 +26,7 @@ export default function SettleForm({ groupId, fromId, toId, fromName, toName, am
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!entered) return setMsg("Enter a valid amount");
-    if (tooMuch) return setMsg(`That is more than the ${formatMinor(amountMinor, currency)} owed`);
+    if (tooMuch) return setMsg(`That is more than the ${formatPlain(amountMinor, currency)} owed`);
     setBusy(true);
     const r = await submitOp({ kind: "settlement", groupId, clientId: newClientId(), data: { fromId, toId, amountMinor: entered, currency, method, date } });
     setBusy(false);
@@ -42,8 +42,8 @@ export default function SettleForm({ groupId, fromId, toId, fromName, toName, am
     <form onSubmit={save} className="mt-2 space-y-2 rounded-lg border border-line p-3">
       <p className="text-sm">{fromName} pays {toName}. Enter the full amount or just part of it.</p>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick amounts">
-        <button type="button" className="btn-ghost" onClick={() => setAmount(minorToInput(amountMinor, currency))}>Full {formatMinor(amountMinor, currency)}</button>
-        {half > 0 && <button type="button" className="btn-ghost" onClick={() => setAmount(minorToInput(half, currency))}>Half {formatMinor(half, currency)}</button>}
+        <button type="button" className="btn-ghost" onClick={() => setAmount(minorToInput(amountMinor, currency))}>Full {formatPlain(amountMinor, currency)}</button>
+        {half > 0 && <button type="button" className="btn-ghost" onClick={() => setAmount(minorToInput(half, currency))}>Half {formatPlain(half, currency)}</button>}
       </div>
       <div className="flex flex-wrap gap-2">
         <input className="input w-36" inputMode="decimal" aria-label="Amount paid" value={amount} onChange={(e) => { setAmount(e.target.value); setMsg(""); }} />
@@ -54,10 +54,10 @@ export default function SettleForm({ groupId, fromId, toId, fromName, toName, am
       </div>
       {remaining !== null && (
         <p className="text-sm text-muted" role="status">
-          {remaining === 0 ? "This clears the debt." : `${formatMinor(remaining, currency)} will still be owed after this.`}
+          {remaining === 0 ? "This clears the debt." : `${formatPlain(remaining, currency)} will still be owed after this.`}
         </p>
       )}
-      {(msg || tooMuch) && <p role="alert" className="text-sm text-red-600">{msg || `More than the ${formatMinor(amountMinor, currency)} owed`}</p>}
+      {(msg || tooMuch) && <p role="alert" className="text-sm text-red-600">{msg || `More than the ${formatPlain(amountMinor, currency)} owed`}</p>}
       <div className="flex gap-2">
         <button className="btn" disabled={busy || tooMuch || !entered}>Record</button>
         <button type="button" className="btn-ghost" onClick={() => { setOpen(false); setMsg(""); }}>Cancel</button>

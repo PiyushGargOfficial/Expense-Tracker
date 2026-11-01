@@ -3,6 +3,7 @@ import { useRef, useState, useTransition } from "react";
 import { saveInvestment, saveGoal } from "@/app/actions";
 import { ASSET_TYPES, PLATFORM_SUGGESTIONS } from "@/lib/investments";
 import { CURRENCIES, minorToInput } from "@/lib/money";
+import CadHint from "@/components/CadHint";
 
 export type InvestmentValues = { id: string; platform: string; name: string; assetType: string; currency: string; investedMinor: number; valueMinor: number; goalId: string | null; note: string | null };
 export type GoalValues = { id: string; name: string; currency: string; targetMinor: number; targetDate: string | null; note: string | null };
@@ -69,6 +70,10 @@ export function InvestmentForm({ investment, defaultCurrency, platforms, goals, 
         <label className="label" htmlFor={`val-${id}`}>Current value</label>
         <input id={`val-${id}`} name="value" inputMode="decimal" className="input" defaultValue={investment ? minorToInput(investment.valueMinor, cur) : ""} placeholder="Same as invested" onChange={clear} />
       </div>
+      <div className="col-span-2 space-y-0.5">
+        <CadHint amountName="invested" currency={investment ? cur : undefined} />
+        <CadHint amountName="value" currency={investment ? cur : undefined} />
+      </div>
       <div className="col-span-2">
         <label className="label" htmlFor={`note-${id}`}>Note (optional)</label>
         <input id={`note-${id}`} name="note" className="input" defaultValue={investment?.note ?? ""} maxLength={300} onChange={clear} />
@@ -122,6 +127,7 @@ export function GoalForm({ goal, defaultCurrency, onDone }: { goal?: GoalValues;
           ? <input id={`gcur-${id}`} className="input" value={cur} disabled readOnly />
           : <select id={`gcur-${id}`} name="currency" className="input" defaultValue={defaultCurrency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>}
       </div>
+      <CadHint amountName="target" currency={goal ? cur : undefined} className="col-span-2" />
       <div className="col-span-2">
         <label className="label" htmlFor={`gdate-${id}`}>Target date (optional)</label>
         <input id={`gdate-${id}`} name="targetDate" type="date" className="input" defaultValue={goal?.targetDate ?? ""} onChange={clear} />

@@ -1,3 +1,4 @@
+import CadHint from "@/components/CadHint";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { CURRENCIES, formatMinor } from "@/lib/money";
@@ -65,6 +66,7 @@ export default async function Recurring() {
         <input name="title" className="input col-span-2" placeholder="Netflix, Rent…" aria-label="Title" required />
         <input name="amount" inputMode="decimal" className="input" placeholder="Amount" aria-label="Amount" required />
         <select name="currency" className="input" aria-label="Currency" defaultValue={user.defaultCurrency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
+        <CadHint amountName="amount" className="col-span-2" />
         <select name="frequency" className="input" aria-label="Frequency" defaultValue="MONTHLY"><option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="BIWEEKLY">Every 2 weeks (biweekly)</option><option value="MONTHLY">Monthly</option><option value="YEARLY">Yearly</option></select>
         <input name="nextDate" type="date" className="input" aria-label="Next date" required />
         <select name="categoryId" className="input col-span-2" aria-label="Category"><option value="">No category</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>

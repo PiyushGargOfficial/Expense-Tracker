@@ -1,4 +1,5 @@
 "use client";
+import { CadAmountHint } from "@/components/CadHint";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
@@ -57,6 +58,7 @@ export default function RecordPaymentForm({ groupId, members, meId, currency }: 
           {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
       </div>
+      <CadAmountHint amount={amount} currency={cur} />
       <div className="flex flex-wrap gap-2">
         <input type="date" className="input w-44" aria-label="Date paid" value={date} onChange={(e) => setDate(e.target.value)} />
         <input className="input min-w-40 flex-1" placeholder="Note (optional)" aria-label="Note" value={note} onChange={(e) => setNote(e.target.value)} />

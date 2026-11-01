@@ -5,6 +5,7 @@ import { groupLedger, monthRange } from "@/lib/queries";
 import Link from "next/link";
 import { deleteBudget, setBudget } from "@/app/actions";
 import BudgetEdit from "@/components/BudgetEdit";
+import CadHint from "@/components/CadHint";
 
 export default async function Budgets() {
   const user = await requireUser();
@@ -105,6 +106,7 @@ export default async function Budgets() {
         <select name="categoryId" className="input" aria-label="Category"><option value="">Overall</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <select name="currency" className="input" aria-label="Currency" defaultValue={user.defaultCurrency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
         <input name="limit" inputMode="decimal" className="input" placeholder="Monthly limit" aria-label="Monthly limit" required />
+        <CadHint amountName="limit" className="col-span-2" />
         <input name="alert" type="number" min={1} max={100} className="input" defaultValue={80} aria-label="Alert at percent" />
         <button className="btn col-span-2">Save budget</button>
       </form>
