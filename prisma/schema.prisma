@@ -91,6 +91,8 @@ enum TxnType {
   EXPENSE
   INCOME
   TRANSFER
+  // Money moved into an investment. Not spending: kept out of expense totals, budgets and reports.
+  INVEST
 }
 
 model Transaction {
@@ -113,6 +115,9 @@ model Transaction {
   toAccountId   String?
   toAccount     Account?  @relation("TxnToAccount", fields: [toAccountId], references: [id], onDelete: SetNull)
   recurringId   String?
+  // Set on INVEST rows: the holding this contribution was added to (matched by the note, which is the investment's name).
+  investmentId  String?
+  investment    Investment? @relation(fields: [investmentId], references: [id], onDelete: SetNull)
   // Set when this row is the user's own share of a group expense. The group expense is the source of truth;
   // this row is kept in step with it (see lib/mirror.ts), so totals, budgets and reports include group spending.
   groupExpenseId String?
@@ -183,6 +188,7 @@ model Investment {
   note        String?
   goalId      String?
   goal        InvestmentGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  txns        Transaction[]
   updatedAt   DateTime @updatedAt
 
   @@index([userId])

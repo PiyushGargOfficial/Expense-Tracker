@@ -16,7 +16,7 @@ const date = z.string().transform((s, ctx) => {
 });
 
 export const txnSchema = z.object({
-  type: z.enum(["EXPENSE", "INCOME", "TRANSFER"]),
+  type: z.enum(["EXPENSE", "INCOME", "TRANSFER", "INVEST"]),
   amountMinor: minor,
   currency,
   date,
@@ -28,6 +28,8 @@ export const txnSchema = z.object({
   accountId: z.string().nullish(),
   toAccountId: z.string().nullish(),
   receiptUrl: z.string().max(500_000).nullish(),
+  // INVEST only: the platform to file a brand-new investment under (ignored when the name already exists).
+  platform: z.string().max(60).optional(),
 });
 
 export async function createTxn(userId: string, clientId: string, raw: unknown) {
@@ -40,7 +42,19 @@ export async function createTxn(userId: string, clientId: string, raw: unknown) 
 
   const existing = await db.transaction.findUnique({ where: { userId_clientId: { userId, clientId } } });
   if (existing) return existing; // already applied
-  return db.transaction.create({ data: { ...d, tags: d.tags, userId, clientId } });
+  const { platform, ...data } = d;
+  if (d.type !== "INVEST") return db.transaction.create({ data: { ...data, tags: d.tags, userId, clientId } });
+
+  // An investment is matched by name (the note) and currency: it adds to that holding, or creates it.
+  const name = (d.note ?? "").trim().replace(/\s+/g, " ");
+  if (!name) throw new Error("Enter the investment name in the note");
+  return db.$transaction(async (tx) => {
+    const holding = await tx.investment.findFirst({ where: { userId, currency: d.currency, name: { equals: name, mode: "insensitive" } } });
+    const inv = holding
+      ? await tx.investment.update({ where: { id: holding.id }, data: { investedMinor: { increment: d.amountMinor }, valueMinor: { increment: d.amountMinor } } })
+      : await tx.investment.create({ data: { userId, name, platform: platform?.trim() || "Other", currency: d.currency, investedMinor: d.amountMinor, valueMinor: d.amountMinor } });
+    return tx.transaction.create({ data: { ...data, note: inv.name, categoryId: null, toAccountId: null, tags: d.tags, userId, clientId, investmentId: inv.id } });
+  });
 }
 
 export const splitSchema = z.discriminatedUnion("type", [

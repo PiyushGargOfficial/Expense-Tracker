@@ -86,8 +86,17 @@ export async function ensureDefaults(userId: string) {
 export async function deleteTxn(id: string) {
   const u = await requireUser();
   // Rows that mirror a group expense are managed from the group (deleting only the mirror would just bring it back).
-  await db.transaction.deleteMany({ where: { id, userId: u.id, groupExpenseId: null } });
-  revalidatePath("/");
+  const t = await db.transaction.findFirst({ where: { id, userId: u.id, groupExpenseId: null }, select: { investmentId: true, amountMinor: true } });
+  if (!t) return;
+  await db.$transaction(async (tx) => {
+    await tx.transaction.delete({ where: { id } });
+    // Taking back an investment contribution takes it off the holding too (never below zero).
+    if (t.investmentId) {
+      const h = await tx.investment.findUnique({ where: { id: t.investmentId } });
+      if (h) await tx.investment.update({ where: { id: h.id }, data: { investedMinor: Math.max(0, h.investedMinor - t.amountMinor), valueMinor: Math.max(0, h.valueMinor - t.amountMinor) } });
+    }
+  });
+  revalidatePath("/"); revalidatePath("/investments");
 }
 
 type SaveResult = { ok: true } | { ok: false; error: string };

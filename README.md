@@ -25,7 +25,9 @@ interest rate, and what was paid since the last statement. Cards due within 7 da
 
 **Investments**: holdings on each platform (Wealthsimple, Questrade, crypto, GICs…) with amount invested, current value
 and gain or loss, totals per platform and currency, and goals with progress, amount to go and the monthly amount needed
-by the target date. Private to you. Values are entered by hand.
+by the target date. Private to you. Values are entered by hand. The **Invest** tab on Home records money put into an investment: it is matched to a holding by name
+(or creates one), is shown as Invested rather than spent, and is kept out of budgets and reports. Deleting it takes it
+off the holding again.
 
 **Groups**: create groups, invite link, name-only members (claimable on join), equal / exact / percent / shares /
 itemized splits, single or multiple payers, per-group balances, simplified "who owes whom", partial settle-up

@@ -7,10 +7,13 @@ import { parseToMinor, CURRENCIES } from "@/lib/money";
 type Opt = { id: string; name: string };
 export type GroupOpt = { id: string; name: string; meId: string; memberIds: string[]; currency: string };
 
-export default function QuickAdd({ categories, accounts, currency, groups }: { categories: Opt[]; accounts: (Opt & { currency: string })[]; currency: string; groups: GroupOpt[] }) {
+export type HoldingOpt = { name: string; platform: string; currency: string };
+
+export default function QuickAdd({ categories, accounts, currency, groups, holdings = [] }: { categories: Opt[]; accounts: (Opt & { currency: string })[]; currency: string; groups: GroupOpt[]; holdings?: HoldingOpt[] }) {
   const router = useRouter();
   const amountRef = useRef<HTMLInputElement>(null);
-  const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
+  const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "INVEST">("EXPENSE");
+  const [platform, setPlatform] = useState("");
   const [cur, setCur] = useState(currency);
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -22,12 +25,16 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
   const [busy, setBusy] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [splitMode, setSplitMode] = useState<"me" | "equal">("me");
+  const invest = type === "INVEST";
+  const investName = note.trim().replace(/\s+/g, " ").toLowerCase();
+  const knownHolding = invest ? holdings.find((h) => h.currency === cur && h.name.toLowerCase() === investName) : undefined;
   const group = type === "EXPENSE" ? groups.find((g) => g.id === groupId) : undefined;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const amountMinor = parseToMinor(amount, cur);
     if (!amountMinor) return setMsg({ text: `Enter a valid amount in ${cur}`, bad: true });
+    if (invest && !note.trim()) return setMsg({ text: "Enter the investment name in the note", bad: true });
     setBusy(true);
     // With a group selected this becomes a group expense (paid by you); your share also lands in your personal
     // totals automatically, so nothing is entered twice.
@@ -51,7 +58,8 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
       clientId: newClientId(),
       data: {
         type, amountMinor, currency: cur, date, note: note || undefined,
-        categoryId: type === "TRANSFER" ? null : categoryId || null,
+        categoryId: type === "TRANSFER" || invest ? null : categoryId || null,
+        platform: invest && !knownHolding ? platform.trim() || undefined : undefined,
         accountId: accountId || null,
         toAccountId: type === "TRANSFER" ? toAccountId || null : null,
       },
@@ -59,7 +67,7 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
     setBusy(false);
     if (r.status === "error") return setMsg({ text: r.error, bad: true });
     setMsg({ text: r.status === "queued" ? "Saved offline. Will sync when you're back online." : "Added" });
-    setAmount(""); setNote("");
+    setAmount(""); setNote(""); setPlatform("");
     amountRef.current?.focus();
     if (r.status === "synced") router.refresh();
   }
@@ -67,10 +75,10 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
   return (
     <form onSubmit={submit} className="card space-y-3">
       <div role="tablist" className="flex gap-1 text-sm">
-        {(["EXPENSE", "INCOME", "TRANSFER"] as const).map((t) => (
+        {(["EXPENSE", "INCOME", "TRANSFER", "INVEST"] as const).map((t) => (
           <button type="button" key={t} role="tab" aria-selected={type === t} onClick={() => setType(t)}
             className={`rounded-full px-3 py-1 ${type === t ? "bg-emerald-600 text-white" : "border border-line"}`}>
-            {t[0] + t.slice(1).toLowerCase()}
+            {t === "INVEST" ? "Invest" : t[0] + t.slice(1).toLowerCase()}
           </button>
         ))}
       </div>
@@ -82,7 +90,7 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
         </select>
       </div>
 
-      {type !== "TRANSFER" && (
+      {type !== "TRANSFER" && !invest && (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Category">
           {categories.map((c) => (
             <button type="button" key={c.id} aria-pressed={categoryId === c.id} onClick={() => setCategoryId(categoryId === c.id ? "" : c.id)}
@@ -94,7 +102,7 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        <select aria-label={type === "TRANSFER" ? "From account" : "Account"} className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+        <select aria-label={type === "TRANSFER" ? "From account" : invest ? "Paid from account" : "Account"} className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
         {type === "TRANSFER" ? (
@@ -106,7 +114,20 @@ export default function QuickAdd({ categories, accounts, currency, groups }: { c
           <input type="date" aria-label="Date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
         )}
       </div>
-      <input placeholder="Note (optional)" aria-label="Note" className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+      <input placeholder={invest ? "Investment name, e.g. XEQT" : "Note (optional)"} aria-label={invest ? "Investment name" : "Note"} className="input" list={invest ? "holding-names" : undefined} value={note} onChange={(e) => setNote(e.target.value)} />
+      {invest && (
+        <>
+          <datalist id="holding-names">{[...new Set(holdings.filter((h) => h.currency === cur).map((h) => h.name))].map((n) => <option key={n} value={n} />)}</datalist>
+          {knownHolding ? (
+            <p className="text-xs text-muted">Adds to your existing {knownHolding.name} on {knownHolding.platform}. It is not counted as spending.</p>
+          ) : (
+            <>
+              <input placeholder="Platform for this new investment, e.g. Questrade" aria-label="Platform" className="input" value={platform} onChange={(e) => setPlatform(e.target.value)} />
+              <p className="text-xs text-muted">A new investment is created with this name. It is not counted as spending.</p>
+            </>
+          )}
+        </>
+      )}
 
       {type === "EXPENSE" && groups.length > 0 && (
         <div className="space-y-2 rounded-lg border border-line p-2">

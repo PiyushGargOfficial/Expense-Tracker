@@ -4,12 +4,13 @@ import { requireUser } from "@/lib/session";
 import { formatMinor } from "@/lib/money";
 import { groupLedger, monthRange } from "@/lib/queries";
 import QuickAdd from "@/components/QuickAdd";
+import { totalsByCurrency } from "@/lib/investments";
 import { deleteTxn } from "@/app/actions";
 
 export default async function Home() {
   const user = await requireUser();
   const { start, end } = monthRange();
-  const [categories, accounts, recent, month, memberships] = await Promise.all([
+  const [categories, accounts, recent, month, memberships, holdings] = await Promise.all([
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
     db.account.findMany({ where: { userId: user.id, archived: false } }),
     db.transaction.findMany({
@@ -18,7 +19,9 @@ export default async function Home() {
     }),
     db.transaction.groupBy({ by: ["type", "currency"], where: { userId: user.id, date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
     db.member.findMany({ where: { userId: user.id, left: false }, include: { group: { include: { members: { where: { left: false }, select: { id: true } } } } } }),
+    db.investment.findMany({ where: { userId: user.id }, select: { name: true, platform: true, currency: true, investedMinor: true, valueMinor: true } }),
   ]);
+  const worth = totalsByCurrency(holdings);
   const groupOpts = memberships.map((m) => ({ id: m.groupId, name: m.group.name, meId: m.id, memberIds: m.group.members.map((x) => x.id), currency: m.group.defaultCurrency }));
   const groupSpend = await db.transaction.groupBy({ by: ["currency"], where: { userId: user.id, type: "EXPENSE", groupExpenseId: { not: null }, date: { gte: start, lt: end } }, _sum: { amountMinor: true } });
 
@@ -38,7 +41,7 @@ export default async function Home() {
     // One column on phones; on laptops and larger, entry + totals on the left, balances + history on the right.
     <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
      <div className="space-y-5 lg:sticky lg:top-8">
-      <QuickAdd categories={categories} accounts={accounts} currency={user.defaultCurrency} groups={groupOpts} />
+      <QuickAdd categories={categories} accounts={accounts} currency={user.defaultCurrency} groups={groupOpts} holdings={holdings} />
 
       <section className="grid grid-cols-2 gap-3" aria-label="This month">
         <div className="card">
@@ -53,6 +56,16 @@ export default async function Home() {
         <div className="card">
           <div className="text-sm text-muted">Income this month</div>
           {sum("INCOME").length ? sum("INCOME").map((r) => <div key={r.currency} className="break-words text-lg font-semibold sm:text-xl">{formatMinor(r._sum.amountMinor ?? 0, r.currency)}</div>) : <div className="text-lg font-semibold sm:text-xl">0</div>}
+        </div>
+        <div className="card col-span-2">
+          <div className="flex items-baseline justify-between">
+            <div className="text-sm text-muted">Invested this month</div>
+            <Link href="/investments" className="-m-2 p-2 text-xs underline">Investments</Link>
+          </div>
+          {sum("INVEST").length ? sum("INVEST").map((r) => <div key={r.currency} className="break-words text-lg font-semibold text-sky-600 sm:text-xl">{formatMinor(r._sum.amountMinor ?? 0, r.currency)}</div>) : <div className="text-lg font-semibold sm:text-xl">0</div>}
+          {Object.entries(worth).length > 0 && (
+            <div className="mt-1 text-xs text-muted">Portfolio value: {Object.entries(worth).map(([c, t]) => formatMinor(t.valueMinor, c)).join(", ")}. Not counted as spending or in budgets.</div>
+          )}
         </div>
       </section>
      </div>
@@ -96,7 +109,7 @@ export default async function Home() {
               <div className="min-w-0">
                 <div className="truncate">{t.note || t.category?.name || t.type.toLowerCase()}</div>
                 <div className="text-xs text-muted">
-                  {t.date.toISOString().slice(0, 10)} · {t.category?.name ?? "Uncategorised"}{t.account ? ` · ${t.account.name}` : ""}
+                  {t.date.toISOString().slice(0, 10)} · {t.type === "INVEST" ? "Invested" : t.category?.name ?? "Uncategorised"}{t.account ? ` · ${t.account.name}` : ""}
                   {t.groupExpense && (
                     <> · <Link className="underline" href={`/groups/${t.groupExpense.group.id}`}>{t.groupExpense.group.name}</Link>
                       {t.groupExpense.amountMinor !== t.amountMinor && ` (your share of ${formatMinor(t.groupExpense.amountMinor, t.groupExpense.currency)})`}</>
@@ -104,7 +117,7 @@ export default async function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={t.type === "INCOME" ? "text-emerald-600" : ""}>{t.type === "INCOME" ? "+" : t.type === "EXPENSE" ? "-" : ""}{formatMinor(t.amountMinor, t.currency)}</span>
+                <span className={t.type === "INCOME" ? "text-emerald-600" : t.type === "INVEST" ? "text-sky-600" : ""}>{t.type === "INCOME" ? "+" : t.type === "EXPENSE" ? "-" : ""}{formatMinor(t.amountMinor, t.currency)}</span>
                 {t.groupExpense ? (
                   <Link className="-m-2 p-2 text-xs text-muted underline" href={`/groups/${t.groupExpense.group.id}/expenses/${t.groupExpenseId}`}>Open</Link>
                 ) : (

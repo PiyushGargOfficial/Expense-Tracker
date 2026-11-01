@@ -40,6 +40,9 @@ describe("balances", () => {
     expect(deltaFor("A", "CAD", txns)).toEqual({ delta: -1000 + 5000 - 2000 + 700, skipped: 0 });
     expect(deltaFor("B", "CAD", txns)).toEqual({ delta: 2000 - 700, skipped: 0 });
   });
+  it("an investment takes money out of the paying account", () => {
+    expect(deltaFor("A", "CAD", [t({ type: "INVEST", amountMinor: 2500, accountId: "A" })])).toEqual({ delta: -2500, skipped: 0 });
+  });
   it("does not mix currencies; it counts them as skipped", () => {
     const r = deltaFor("A", "CAD", [t({ amountMinor: 999, currency: "USD", accountId: "A" }), t({ amountMinor: 100, accountId: "A" })]);
     expect(r).toEqual({ delta: -100, skipped: 1 });
