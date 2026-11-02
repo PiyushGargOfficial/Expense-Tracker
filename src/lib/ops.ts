@@ -57,6 +57,42 @@ export async function createTxn(userId: string, clientId: string, raw: unknown) 
   });
 }
 
+export const txnEditSchema = txnSchema.omit({ type: true, platform: true, receiptUrl: true }).extend({ type: z.enum(["EXPENSE", "INCOME"]).optional() });
+
+/**
+ * Edits one of the user's own entries (not the mirror of a group expense, which is edited from the group).
+ * Expense and income can switch between each other; a transfer or investment keeps its type. An investment keeps its
+ * name and currency, and changing its amount moves the holding by the difference.
+ */
+export async function updateTxn(userId: string, id: string, raw: unknown) {
+  const d = txnEditSchema.parse(raw);
+  const t = await db.transaction.findFirst({ where: { id, userId, groupExpenseId: null } });
+  if (!t) throw new Error("Transaction not found");
+  const ids = [d.accountId, d.toAccountId].filter(Boolean) as string[];
+  if (ids.length && (await db.account.count({ where: { id: { in: ids }, userId } })) !== ids.length) throw new Error("Bad account");
+  if (d.categoryId && !(await db.category.count({ where: { id: d.categoryId, userId } }))) throw new Error("Bad category");
+  if (t.type === "TRANSFER" && (!d.accountId || !d.toAccountId || d.accountId === d.toAccountId)) throw new Error("Pick two different accounts");
+  const account = d.accountId && d.accountId !== t.accountId ? await db.account.findUnique({ where: { id: d.accountId }, select: { name: true } }) : null;
+  const common = {
+    amountMinor: d.amountMinor, date: d.date, merchant: d.merchant || null, tags: d.tags, accountId: d.accountId || null,
+    paymentMethod: t.type === "TRANSFER" ? null : d.accountId ? account?.name ?? t.paymentMethod : null,
+  };
+  if (t.type === "INVEST") {
+    await db.$transaction(async (tx) => {
+      await tx.transaction.update({ where: { id }, data: { ...common, categoryId: null, toAccountId: null } });
+      const h = t.investmentId ? await tx.investment.findUnique({ where: { id: t.investmentId } }) : null;
+      const delta = d.amountMinor - t.amountMinor;
+      if (h && delta) await tx.investment.update({ where: { id: h.id }, data: { investedMinor: Math.max(0, h.investedMinor + delta), valueMinor: Math.max(0, h.valueMinor + delta) } });
+    });
+    return;
+  }
+  const type = t.type === "TRANSFER" ? "TRANSFER" : d.type ?? t.type;
+  await db.transaction.update({
+    where: { id },
+    data: { ...common, type, currency: d.currency, note: d.note || null, categoryId: type === "TRANSFER" ? null : d.categoryId || null, toAccountId: type === "TRANSFER" ? d.toAccountId || null : null },
+  });
+}
+
 export const splitSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("EQUAL"), memberIds: z.array(z.string()).min(1) }),
   z.object({ type: z.literal("EXACT"), amounts: z.record(z.string(), z.number().int().min(0)) }),

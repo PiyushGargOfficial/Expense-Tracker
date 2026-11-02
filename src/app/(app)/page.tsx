@@ -121,7 +121,10 @@ export default async function Home() {
                 {t.groupExpense ? (
                   <Link className="-m-2 p-2 text-xs text-muted underline" href={`/groups/${t.groupExpense.group.id}/expenses/${t.groupExpenseId}`}>Open</Link>
                 ) : (
-                  <form action={deleteTxn.bind(null, t.id)}><button className="-m-2 p-2 text-xs text-muted underline" aria-label="Delete">Delete</button></form>
+                  <>
+                    <Link className="-m-2 p-2 text-xs text-muted underline" href={`/transactions/${t.id}`}>Edit</Link>
+                    <form action={deleteTxn.bind(null, t.id)}><button className="-m-2 p-2 text-xs text-muted underline" aria-label="Delete">Delete</button></form>
+                  </>
                 )}
               </div>
             </li>

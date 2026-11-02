@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { requireUser, requireMember } from "@/lib/session";
 import { CURRENCIES, formatPlain, parseToMinor } from "@/lib/money";
 import { KIND_VALUES, deltaFor, parseAprBps, parseSigned, type AccountKindValue } from "@/lib/accounts";
-import { deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense } from "@/lib/ops";
+import { deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense, updateTxn } from "@/lib/ops";
 import { computeShares, validatePayers, type SplitInput } from "@/lib/split";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -103,6 +103,18 @@ export async function deleteTxn(id: string) {
 }
 
 type SaveResult = { ok: true } | { ok: false; error: string };
+
+/** Saves changes to one of your own entries (added from Home or anywhere else). */
+export async function editTxn(id: string, raw: unknown): Promise<SaveResult> {
+  const u = await requireUser();
+  try {
+    await updateTxn(u.id, id, raw);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error && !(e instanceof z.ZodError) ? e.message : "Check the details and try again" };
+  }
+  revalidatePath("/"); revalidatePath("/transactions"); revalidatePath("/budgets"); revalidatePath("/reports"); revalidatePath("/accounts"); revalidatePath("/investments");
+  return { ok: true };
+}
 
 /** Adds an account (id null) or edits one. On edit the "current balance" is turned back into an opening balance. */
 export async function saveAccount(id: string | null, f: FormData): Promise<SaveResult> {
