@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { requireUser, requireMember } from "@/lib/session";
 import { CURRENCIES, formatPlain, parseToMinor } from "@/lib/money";
 import { KIND_VALUES, deltaFor, parseAprBps, parseSigned, type AccountKindValue } from "@/lib/accounts";
-import { deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense, updateTxn } from "@/lib/ops";
+import { deleteGroup, deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense, updateTxn } from "@/lib/ops";
 import { computeShares, validatePayers, type SplitInput } from "@/lib/split";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -167,7 +167,7 @@ export async function saveAccount(id: string | null, f: FormData): Promise<SaveR
     await db.account.create({ data: { userId: u.id, currency, openingMinor: balance, ...fields } });
   } else {
     // Keep the transactions as they are: opening = what you say the balance is now, minus what they added up to.
-    const txns = await db.transaction.findMany({ where: { userId: u.id, OR: [{ accountId: existing.id }, { toAccountId: existing.id }] }, select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true } });
+    const txns = await db.transaction.findMany({ where: { userId: u.id, deletedAt: null, OR: [{ accountId: existing.id }, { toAccountId: existing.id }] }, select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true } });
     const { delta } = deltaFor(existing.id, currency, txns);
     // The amount owed on a card is calculated from its starting balance and the recorded transactions. It can be
     // raised (fees, interest), but not lowered by editing: pay it down by recording a payment.
@@ -452,7 +452,7 @@ export async function addMember(groupId: string, f: FormData) {
 /** Join through an invite link. If a name-only member is picked, the user takes over that member (keeps history). */
 export async function joinGroup(code: string, claimMemberId?: string) {
   const u = await requireUser();
-  const g = await db.group.findUnique({ where: { inviteCode: code } });
+  const g = await db.group.findFirst({ where: { inviteCode: code, deletedAt: null } });
   if (!g) throw new Error("Invalid invite");
   const mine = await db.member.findFirst({ where: { groupId: g.id, userId: u.id } });
   if (mine) {
@@ -472,6 +472,14 @@ export async function leaveGroup(groupId: string) {
   const u = await requireUser();
   const m = await requireMember(groupId, u.id);
   await db.member.update({ where: { id: m.id }, data: { left: true } }); // history and balances stay intact
+  redirect("/groups");
+}
+
+export async function removeGroup(groupId: string) {
+  const u = await requireUser();
+  const m = await requireMember(groupId, u.id);
+  await deleteGroup({ id: u.id, name: u.name }, m.role === "ADMIN", groupId);
+  for (const p of ["/", "/groups", "/transactions", "/budgets", "/reports", "/accounts", "/recurring"]) revalidatePath(p);
   redirect("/groups");
 }
 

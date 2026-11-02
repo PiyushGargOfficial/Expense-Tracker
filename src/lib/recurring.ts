@@ -30,7 +30,7 @@ export async function addRecurringToExpenses(userId: string, ids: string[]) {
     const date = (r.nextDate <= today ? r.nextDate : today).toISOString();
     try {
       if (r.groupId && r.groupData) {
-        const member = await db.member.findFirst({ where: { groupId: r.groupId, userId, left: false } });
+        const member = await db.member.findFirst({ where: { groupId: r.groupId, userId, left: false, group: { deletedAt: null } } });
         if (!member) throw new Error("You are no longer in that group");
         const g = r.groupData as { payers: Record<string, number>; split: unknown };
         const category = r.categoryId ? (await db.category.findFirst({ where: { id: r.categoryId, userId }, select: { name: true } }))?.name ?? null : null;

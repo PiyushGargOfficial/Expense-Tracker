@@ -16,7 +16,7 @@ export default async function Accounts() {
   const [accounts, txns] = await Promise.all([
     db.account.findMany({ where: { userId: user.id }, orderBy: [{ kind: "asc" }, { name: "asc" }] }),
     db.transaction.findMany({
-      where: { userId: user.id, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
+      where: { userId: user.id, deletedAt: null, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
       orderBy: { date: "desc" },
       select: { id: true, type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true, note: true, merchant: true, category: { select: { name: true } } },
     }),

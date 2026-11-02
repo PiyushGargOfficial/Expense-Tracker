@@ -14,16 +14,16 @@ export default async function Home() {
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
     db.account.findMany({ where: { userId: user.id, archived: false } }),
     db.transaction.findMany({
-      where: { userId: user.id }, orderBy: { date: "desc" }, take: 10,
+      where: { userId: user.id, deletedAt: null }, orderBy: { date: "desc" }, take: 10,
       include: { category: true, account: true, groupExpense: { select: { amountMinor: true, currency: true, group: { select: { id: true, name: true } } } } },
     }),
-    db.transaction.groupBy({ by: ["type", "currency"], where: { userId: user.id, date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
-    db.member.findMany({ where: { userId: user.id, left: false }, include: { group: { include: { members: { where: { left: false }, select: { id: true } } } } } }),
+    db.transaction.groupBy({ by: ["type", "currency"], where: { userId: user.id, deletedAt: null, date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
+    db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { members: { where: { left: false }, select: { id: true } } } } } }),
     db.investment.findMany({ where: { userId: user.id }, select: { name: true, platform: true, currency: true, investedMinor: true, valueMinor: true } }),
   ]);
   const worth = totalsByCurrency(holdings);
   const groupOpts = memberships.map((m) => ({ id: m.groupId, name: m.group.name, meId: m.id, memberIds: m.group.members.map((x) => x.id), currency: m.group.defaultCurrency }));
-  const groupSpend = await db.transaction.groupBy({ by: ["currency"], where: { userId: user.id, type: "EXPENSE", groupExpenseId: { not: null }, date: { gte: start, lt: end } }, _sum: { amountMinor: true } });
+  const groupSpend = await db.transaction.groupBy({ by: ["currency"], where: { userId: user.id, deletedAt: null, type: "EXPENSE", groupExpenseId: { not: null }, date: { gte: start, lt: end } }, _sum: { amountMinor: true } });
 
   // Overall "you owe / you are owed" across all groups, per currency.
   const totals: Record<string, number> = {};

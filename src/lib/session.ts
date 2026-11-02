@@ -14,7 +14,7 @@ export async function requireUser() {
 
 /** Membership check: the single gate for every group read/write. */
 export async function requireMember(groupId: string, userId: string) {
-  const m = await db.member.findFirst({ where: { groupId, userId, left: false } });
+  const m = await db.member.findFirst({ where: { groupId, userId, left: false, group: { deletedAt: null } } });
   if (!m) throw new Error("Not a member of this group");
   return m;
 }

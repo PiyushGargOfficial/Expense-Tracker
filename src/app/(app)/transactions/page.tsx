@@ -15,7 +15,7 @@ export default async function Transactions({ searchParams }: { searchParams: Pro
   const [txns, cats, groups] = await Promise.all([
     db.transaction.findMany({ where, orderBy, take: 200, include: { category: true, account: true, groupExpense: { select: { group: { select: { name: true } } } } } }),
     db.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
-    db.group.findMany({ where: { members: { some: { userId: user.id } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.group.findMany({ where: { deletedAt: null, members: { some: { userId: user.id } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (

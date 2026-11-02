@@ -6,7 +6,7 @@ import { joinGroup } from "@/app/actions";
 export default async function Join({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   await requireUser();
-  const g = await db.group.findUnique({ where: { inviteCode: code }, include: { members: { where: { userId: null, left: false } } } });
+  const g = await db.group.findFirst({ where: { inviteCode: code, deletedAt: null }, include: { members: { where: { userId: null, left: false } } } });
   if (!g) notFound();
   return (
     <div className="mx-auto max-w-md space-y-4">

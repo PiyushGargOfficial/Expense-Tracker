@@ -17,10 +17,10 @@ export default async function Investments() {
   const [holdings, goals, added, chequing, acctTxns] = await Promise.all([
     db.investment.findMany({ where: { userId: user.id }, orderBy: [{ platform: "asc" }, { name: "asc" }] }),
     db.investmentGoal.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
-    db.transaction.groupBy({ by: ["investmentId"], where: { userId: user.id, type: "INVEST", investmentId: { not: null } }, _sum: { amountMinor: true } }),
+    db.transaction.groupBy({ by: ["investmentId"], where: { userId: user.id, deletedAt: null, type: "INVEST", investmentId: { not: null } }, _sum: { amountMinor: true } }),
     db.account.findMany({ where: { userId: user.id, kind: "BANK", archived: false }, orderBy: { name: "asc" } }),
     db.transaction.findMany({
-      where: { userId: user.id, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
+      where: { userId: user.id, deletedAt: null, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
       select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true },
     }),
   ]);

@@ -13,10 +13,10 @@ export default async function Budgets() {
   const [budgets, categories, spent] = await Promise.all([
     db.budget.findMany({ where: { userId: user.id }, include: { category: true } }),
     db.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
-    db.transaction.groupBy({ by: ["categoryId", "currency"], where: { userId: user.id, type: "EXPENSE", date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
+    db.transaction.groupBy({ by: ["categoryId", "currency"], where: { userId: user.id, deletedAt: null, type: "EXPENSE", date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
   ]);
   // Lent out: money you paid on behalf of others that they haven't paid back yet, across all your groups.
-  const memberships = await db.member.findMany({ where: { userId: user.id, left: false }, include: { group: { include: { members: true } } } });
+  const memberships = await db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { members: true } } } });
   const lent: { groupId: string; group: string; owes: { name: string; amountMinor: number; currency: string }[] }[] = [];
   const lentTotals: Record<string, number> = {};
   const borrowedTotals: Record<string, number> = {};

@@ -66,7 +66,7 @@ export const txnEditSchema = txnSchema.omit({ type: true, platform: true, receip
  */
 export async function updateTxn(userId: string, id: string, raw: unknown) {
   const d = txnEditSchema.parse(raw);
-  const t = await db.transaction.findFirst({ where: { id, userId, groupExpenseId: null } });
+  const t = await db.transaction.findFirst({ where: { id, userId, groupExpenseId: null, deletedAt: null } });
   if (!t) throw new Error("Transaction not found");
   const ids = [d.accountId, d.toAccountId].filter(Boolean) as string[];
   if (ids.length && (await db.account.count({ where: { id: { in: ids }, userId } })) !== ids.length) throw new Error("Bad account");
@@ -261,5 +261,22 @@ export async function deleteSettlement(actor: Actor, isAdmin: boolean, groupId: 
   await db.$transaction(async (tx) => {
     await tx.settlement.update({ where: { id: settlementId }, data: { deletedAt: new Date() } });
     await audit(tx, groupId, actor, "settle.undo", settlementId, "Undid a payment", { amountMinor: s.amountMinor, currency: s.currency, fromId: s.fromId, toId: s.toId });
+  });
+}
+
+/**
+ * Deletes a whole group, for everyone, as a soft delete: the group, its expenses, payments and activity stay in the
+ * database for audit, and every member's personal entry for those expenses is marked deleted so it drops out of
+ * their totals, budgets, reports and exports. Group admins only.
+ */
+export async function deleteGroup(actor: Actor, isAdmin: boolean, groupId: string) {
+  if (!isAdmin) throw new Error("Only a group admin can delete the group");
+  const g = await db.group.findFirst({ where: { id: groupId, deletedAt: null } });
+  if (!g) throw new Error("Group not found");
+  const now = new Date();
+  await db.$transaction(async (tx) => {
+    await tx.group.update({ where: { id: groupId }, data: { deletedAt: now, deletedById: actor.id } });
+    const { count } = await tx.transaction.updateMany({ where: { groupExpense: { groupId }, deletedAt: null }, data: { deletedAt: now } });
+    await audit(tx, groupId, actor, "group.delete", groupId, `Deleted the group "${g.name}"`, { name: g.name }, { personalEntriesRemoved: count });
   });
 }

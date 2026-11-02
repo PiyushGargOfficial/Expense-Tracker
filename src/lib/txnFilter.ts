@@ -7,7 +7,7 @@ const validDate = (s: string | undefined) => (s && !Number.isNaN(new Date(s).get
 
 /** The search filters shared by the All transactions page and its CSV export, so the file matches what is on screen. */
 export function txnWhere(userId: string, sp: TxnFilter): Prisma.TransactionWhereInput {
-  const where: Prisma.TransactionWhereInput = { userId };
+  const where: Prisma.TransactionWhereInput = { userId, deletedAt: null };
   if (sp.q) where.OR = [{ note: { contains: sp.q, mode: "insensitive" } }, { merchant: { contains: sp.q, mode: "insensitive" } }, { tags: { has: sp.q } }];
   if (sp.cat) where.categoryId = sp.cat;
   if (sp.group === "none") where.groupExpenseId = null;

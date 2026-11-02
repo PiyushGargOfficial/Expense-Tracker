@@ -10,7 +10,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   // Reports open in your default currency (CAD) unless another is picked (?cur=INR etc.).
   const currency = cur && /^[A-Za-z]{3}$/.test(cur) ? cur.toUpperCase() : user.defaultCurrency;
   const since = new Date(); since.setUTCMonth(since.getUTCMonth() - 5, 1); since.setUTCHours(0, 0, 0, 0);
-  const txns = await db.transaction.findMany({ where: { userId: user.id, type: "EXPENSE", currency, date: { gte: since } }, include: { category: true } });
+  const txns = await db.transaction.findMany({ where: { userId: user.id, deletedAt: null, type: "EXPENSE", currency, date: { gte: since } }, include: { category: true } });
   const div = 10 ** decimalsFor(currency);
 
   const byCat = new Map<string, number>();
@@ -28,7 +28,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const prev = months.at(-2)?.[1] ?? 0;
   const top = [...byMerchant.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   // Your default currency is always offered, alongside any currency you actually have transactions in.
-  const used = (await db.transaction.findMany({ where: { userId: user.id }, distinct: ["currency"], select: { currency: true } })).map((c) => c.currency);
+  const used = (await db.transaction.findMany({ where: { userId: user.id, deletedAt: null }, distinct: ["currency"], select: { currency: true } })).map((c) => c.currency);
   const otherCurrencies = [...new Set([user.defaultCurrency, ...used])];
 
   // Budget vs used, per category. Budgets are monthly, so "used" is this month's spending only.

@@ -6,7 +6,7 @@ import TxnEditForm from "@/components/TxnEditForm";
 export default async function EditTransaction({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
-  const t = await db.transaction.findFirst({ where: { id, userId: user.id }, include: { groupExpense: { select: { groupId: true } } } });
+  const t = await db.transaction.findFirst({ where: { id, userId: user.id, deletedAt: null }, include: { groupExpense: { select: { groupId: true } } } });
   if (!t) notFound();
   // A share of a group expense is edited from the group, where everyone's split stays in step.
   if (t.groupExpense) redirect(`/groups/${t.groupExpense.groupId}/expenses/${t.groupExpenseId}`);

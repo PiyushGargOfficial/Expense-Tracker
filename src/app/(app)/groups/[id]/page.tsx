@@ -6,6 +6,7 @@ import { groupLedger } from "@/lib/queries";
 import { addMember, leaveGroup, undoSettlement } from "@/app/actions";
 import SettleForm from "@/components/SettleForm";
 import RecordPaymentForm from "@/components/RecordPaymentForm";
+import DeleteGroupButton from "@/components/DeleteGroupButton";
 import { paymentLabel } from "@/lib/payment";
 
 export default async function GroupPage({ params }: { params: Promise<{ id: string }> }) {
@@ -119,7 +120,10 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
           <button className="btn">Add person</button>
         </form>
         <p className="text-sm">Invite link: <code className="break-all rounded bg-black/5 px-1 dark:bg-white/10">/join/{group.inviteCode}</code></p>
-        <form action={leaveGroup.bind(null, id)}><button className="-m-2 p-2 text-sm text-muted underline">Leave group</button></form>
+        <div className="flex items-center gap-5">
+          <form action={leaveGroup.bind(null, id)}><button className="-m-2 p-2 text-sm text-muted underline">Leave group</button></form>
+          {me.role === "ADMIN" && <DeleteGroupButton groupId={id} name={group.name} />}
+        </div>
       </section>
 
       <section className="card" aria-label="Activity">

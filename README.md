@@ -32,6 +32,7 @@ off the holding again.
 **Groups**: create groups, invite link, name-only members (claimable on join), equal / exact / percent / shares /
 itemized splits, single or multiple payers, per-group balances, simplified "who owes whom", partial settle-up
 (cash, Interac e-Transfer, bank transfer, cheque, PayPal), edit/delete (creator or admin, soft delete), audit log activity feed, comments.
+A group admin can delete the whole group (confirmation pop up). It is a soft delete: the group, its expenses and activity stay in the database (`Group.deletedAt`) for audit, and every member's personal row for those expenses is marked deleted (`Transaction.deletedAt`) so it drops out of totals, budgets, reports and exports.
 
 **Offline**: new expenses and settlements are queued in IndexedDB and replayed through `/api/sync`; every op
 carries a `clientId`, so retries never duplicate. Visited pages are cached by the service worker.

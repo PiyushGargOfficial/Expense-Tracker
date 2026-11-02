@@ -124,6 +124,8 @@ model Transaction {
   groupExpense   GroupExpense? @relation(fields: [groupExpenseId], references: [id], onDelete: Cascade)
   // Client-generated id so offline retries never create duplicates.
   clientId      String?
+  // Set when the entry is taken out of tracking (e.g. its group was deleted). The row is kept for audit, never read by the app.
+  deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -226,6 +228,9 @@ model Group {
   kind            String   @default("trip") // trip | flat | couple | other
   defaultCurrency String   @default("CAD")
   inviteCode      String   @unique @default(cuid())
+  // Soft delete: the group, its expenses, payments and activity stay in the database for audit; the app no longer shows them.
+  deletedAt       DateTime?
+  deletedById     String?
   createdAt       DateTime @default(now())
   members         Member[]
   expenses        GroupExpense[]

@@ -14,7 +14,7 @@ export default async function Recurring() {
     db.recurring.findMany({ where: { userId: user.id }, orderBy: { nextDate: "asc" }, include: { category: true } }),
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
     db.account.findMany({ where: { userId: user.id, archived: false }, orderBy: { name: "asc" } }),
-    db.member.findMany({ where: { userId: user.id, left: false }, include: { group: { include: { members: { where: { left: false }, orderBy: { name: "asc" } } } } } }),
+    db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { members: { where: { left: false }, orderBy: { name: "asc" } } } } } }),
   ]);
   const groups = memberships.map((m) => ({ id: m.group.id, name: m.group.name, meId: m.id, defaultCurrency: m.group.defaultCurrency, members: m.group.members.map((x) => ({ id: x.id, name: x.name })) }));
   const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.name;

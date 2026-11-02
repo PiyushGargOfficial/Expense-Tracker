@@ -8,7 +8,7 @@ import { createGroup } from "@/app/actions";
 
 export default async function Groups() {
   const user = await requireUser();
-  const memberships = await db.member.findMany({ where: { userId: user.id, left: false }, include: { group: { include: { _count: { select: { members: true } } } } } });
+  const memberships = await db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { _count: { select: { members: true } } } } } });
   const groups = await db.group.findMany({ where: { id: { in: memberships.map((m) => m.groupId) } }, include: { members: true } });
   const people = totalsByPerson(
     await Promise.all(

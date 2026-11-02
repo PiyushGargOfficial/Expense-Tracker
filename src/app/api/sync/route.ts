@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       if (op.kind === "txn") {
         await createTxn(user.id, op.clientId, op.data);
       } else {
-        const member = await db.member.findFirst({ where: { groupId: op.groupId, userId: user.id, left: false } });
+        const member = await db.member.findFirst({ where: { groupId: op.groupId, userId: user.id, left: false, group: { deletedAt: null } } });
         if (!member) throw new Error("Not a member of this group");
         const actor = { id: user.id, name: user.name };
         if (op.kind === "groupExpense") await createGroupExpense(actor, op.groupId, op.clientId, op.data);
