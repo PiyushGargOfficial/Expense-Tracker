@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { minorToInput } from "@/lib/money";
 
 import { csvCell } from "@/lib/csv";
+import { txnOrderBy, txnWhere, type TxnFilter } from "@/lib/txnFilter";
 
 const esc = csvCell;
 
@@ -11,10 +12,14 @@ function people(list: [string, number][] | undefined, currency: string): string 
   return (list ?? []).map(([name, minor]) => `${name} (${minorToInput(minor, currency)})`).join("; ");
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
-  const txns = await db.transaction.findMany({ where: { userId: session.user.id }, orderBy: { date: "desc" }, include: {
+  // Same filters and order as the All transactions page; with none given, everything is exported.
+  const p = new URL(req.url).searchParams;
+  const sp: TxnFilter = {};
+  for (const k of ["q", "cat", "type", "sort", "from", "to", "group", "currency"] as const) sp[k] = p.get(k) || undefined;
+  const txns = await db.transaction.findMany({ where: txnWhere(session.user.id, sp), orderBy: txnOrderBy(sp.sort), include: {
       category: true,
       account: true,
       // For a group expense: who paid and what each person owes, so the CSV shows the split next to the transaction.

@@ -1,23 +1,17 @@
 import Link from "next/link";
-import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { txnOrderBy, txnWhere, type TxnFilter } from "@/lib/txnFilter";
 import { requireUser } from "@/lib/session";
 import { CURRENCIES, formatMinor } from "@/lib/money";
 
-type SP = { q?: string; cat?: string; type?: string; sort?: string; from?: string; to?: string; group?: string; currency?: string };
+type SP = TxnFilter;
 
 export default async function Transactions({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
   const sp = await searchParams;
-  const where: Prisma.TransactionWhereInput = { userId: user.id };
-  if (sp.q) where.OR = [{ note: { contains: sp.q, mode: "insensitive" } }, { merchant: { contains: sp.q, mode: "insensitive" } }, { tags: { has: sp.q } }];
-  if (sp.cat) where.categoryId = sp.cat;
-  if (sp.group === "none") where.groupExpenseId = null;
-  else if (sp.group) where.groupExpense = { groupId: sp.group };
-  if (sp.currency) where.currency = sp.currency;
-  if (sp.type) where.type = sp.type as "EXPENSE";
-  if (sp.from || sp.to) where.date = { ...(sp.from ? { gte: new Date(sp.from) } : {}), ...(sp.to ? { lte: new Date(`${sp.to}T23:59:59.999Z`) } : {}) };
-  const orderBy: Prisma.TransactionOrderByWithRelationInput = sp.sort === "amount" ? { amountMinor: "desc" } : sp.sort === "oldest" ? { date: "asc" } : { date: "desc" };
+  const where = txnWhere(user.id, sp);
+  const orderBy = txnOrderBy(sp.sort);
+  const exportQuery = new URLSearchParams(Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === "string" && e[1] !== "")).toString();
   const [txns, cats, groups] = await Promise.all([
     db.transaction.findMany({ where, orderBy, take: 200, include: { category: true, account: true, groupExpense: { select: { group: { select: { name: true } } } } } }),
     db.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
@@ -39,7 +33,7 @@ export default async function Transactions({ searchParams }: { searchParams: Pro
         <button className="btn">Apply</button>
       </form>
      <div className="min-w-0 space-y-4">
-      <p className="text-sm text-muted">{txns.length} result{txns.length === 1 ? "" : "s"} · <a className="underline" href="/api/export">Export CSV</a></p>
+      <p className="text-sm text-muted">{txns.length} result{txns.length === 1 ? "" : "s"}{txns.length === 200 ? " shown" : ""} · <a className="underline" href={`/api/export${exportQuery ? `?${exportQuery}` : ""}`}>Export CSV{exportQuery ? " (these filters)" : ""}</a></p>
       <ul className="card divide-y divide-line !p-0">
         {txns.map((t) => (
           <li key={t.id} className="flex justify-between gap-2 px-4 py-2.5">
