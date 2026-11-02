@@ -9,7 +9,10 @@ import { db } from "@/lib/db";
 import { requireUser, requireMember } from "@/lib/session";
 import { CURRENCIES, formatPlain, parseToMinor } from "@/lib/money";
 import { KIND_VALUES, deltaFor, parseAprBps, parseSigned, type AccountKindValue } from "@/lib/accounts";
-import { deleteGroupExpense, deleteSettlement, updateGroupExpense } from "@/lib/ops";
+import { deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense } from "@/lib/ops";
+import { computeShares, validatePayers, type SplitInput } from "@/lib/split";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { parseCsv } from "@/lib/csv";
 import { headers } from "next/headers";
 import { randomBytes } from "node:crypto";
@@ -282,25 +285,81 @@ export async function deleteBudget(id: string) {
   revalidatePath("/budgets");
 }
 
-export async function addRecurring(f: FormData) {
+const recurringSchema = z.object({
+  type: z.enum(["EXPENSE", "INCOME", "TRANSFER", "INVEST"]),
+  title: z.string().trim().min(1).max(120),
+  amount: z.string(),
+  currency: z.string().length(3),
+  frequency: z.enum(["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"]),
+  nextDate: z.string(),
+  categoryId: z.string().nullish(),
+  accountId: z.string().nullish(),
+  toAccountId: z.string().nullish(),
+  merchant: z.string().trim().max(120).nullish(),
+  note: z.string().trim().max(500).nullish(),
+  paymentMethod: z.string().max(40).nullish(),
+  tags: z.array(z.string().trim().min(1).max(30)).max(10).default([]),
+  platform: z.string().trim().max(60).nullish(),
+  // A group bill: the group, who pays and how it is split (member ids, minor units).
+  group: z.object({ groupId: z.string(), payers: z.record(z.string(), z.number().int().min(0)), split: splitSchema }).nullish(),
+});
+
+/** Adds a recurring bill with the same details as a regular entry: type, account, tags, or a group with payers and split. */
+export async function addRecurring(raw: unknown): Promise<SaveResult> {
   const u = await requireUser();
-  const currency = s(f, "currency") || u.defaultCurrency;
-  const amountMinor = parseToMinor(s(f, "amount"), currency);
-  const title = s(f, "title");
-  const nextDate = new Date(s(f, "nextDate"));
-  if (!amountMinor || !title || isNaN(+nextDate)) return;
+  const parsed = recurringSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Check the details and try again" };
+  const d = parsed.data;
+  const currency = d.currency.toUpperCase();
+  if (!(CURRENCIES as readonly string[]).includes(currency)) return { ok: false, error: "Unknown currency" };
+  const amountMinor = parseToMinor(d.amount, currency);
+  if (!amountMinor) return { ok: false, error: `Enter the amount as a number in ${currency}` };
+  const nextDate = new Date(`${d.nextDate}T00:00:00.000Z`);
+  if (Number.isNaN(+nextDate)) return { ok: false, error: "Pick the next date" };
+  const categoryId = d.type === "TRANSFER" || d.type === "INVEST" ? null : d.categoryId || null;
+  const accountId = d.accountId || null;
+  const toAccountId = d.type === "TRANSFER" ? d.toAccountId || null : null;
+  if (categoryId && !(await db.category.count({ where: { id: categoryId, userId: u.id } }))) return { ok: false, error: "Category not found" };
+  const accountIds = [accountId, toAccountId].filter(Boolean) as string[];
+  if (accountIds.length && (await db.account.count({ where: { id: { in: accountIds }, userId: u.id } })) !== accountIds.length) return { ok: false, error: "Account not found" };
+  if (d.type === "TRANSFER" && (!accountId || !toAccountId || accountId === toAccountId)) return { ok: false, error: "Pick two different accounts for a transfer" };
+
+  let groupId: string | null = null;
+  let groupData: { payers: Record<string, number>; split: unknown } | undefined;
+  if (d.group) {
+    if (d.type !== "EXPENSE") return { ok: false, error: "Only expenses can be added to a group" };
+    await requireMember(d.group.groupId, u.id);
+    const valid = new Set((await db.member.findMany({ where: { groupId: d.group.groupId, left: false }, select: { id: true } })).map((m) => m.id));
+    const payers = Object.fromEntries(Object.entries(d.group.payers).filter(([, v]) => v > 0));
+    try {
+      validatePayers(amountMinor, payers, currency);
+      const owed = computeShares(amountMinor, d.group.split as SplitInput, Object.keys(payers), currency);
+      for (const id of [...Object.keys(payers), ...Object.keys(owed)]) if (!valid.has(id)) return { ok: false, error: "Someone in this split is no longer in the group" };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "The split does not add up" };
+    }
+    groupId = d.group.groupId;
+    groupData = { payers, split: d.group.split };
+  }
   await db.recurring.create({
-    data: { userId: u.id, title, amountMinor, currency, frequency: s(f, "frequency") as "MONTHLY", nextDate, categoryId: s(f, "categoryId") || null },
+    data: {
+      userId: u.id, type: d.type, title: d.title, amountMinor, currency, frequency: d.frequency, nextDate,
+      categoryId, accountId, toAccountId, merchant: d.merchant || null, note: d.note || null, paymentMethod: d.paymentMethod || null,
+      tags: d.tags, platform: d.type === "INVEST" ? d.platform || null : null, groupId, groupData: groupData as Prisma.InputJsonValue | undefined,
+    },
   });
   revalidatePath("/recurring");
+  return { ok: true };
 }
 
-/** Adds the ticked recurring bills to the expenses (one occurrence each). Recurring bills are never posted automatically. */
-export async function addSelectedRecurring(f: FormData) {
+/** Adds the ticked recurring bills (one occurrence each). Recurring bills are never posted automatically. Returns a message when some could not be added. */
+export async function addSelectedRecurring(_: string, f: FormData): Promise<string> {
   const u = await requireUser();
   const ids = f.getAll("ids").map(String).slice(0, 100);
-  if (ids.length) await addRecurringToExpenses(u.id, ids);
-  revalidatePath("/recurring"); revalidatePath("/"); revalidatePath("/transactions"); revalidatePath("/budgets"); revalidatePath("/reports");
+  const r = ids.length ? await addRecurringToExpenses(u.id, ids) : { added: 0, failed: [] as string[] };
+  revalidatePath("/recurring"); revalidatePath("/"); revalidatePath("/transactions"); revalidatePath("/budgets"); revalidatePath("/reports"); revalidatePath("/groups"); revalidatePath("/investments");
+  if (r.failed.length) return `${r.added} added. Not added: ${r.failed.join("; ")}`;
+  return r.added ? `${r.added} added.` : "";
 }
 
 export async function deleteRecurring(id: string) {

@@ -160,6 +160,16 @@ model Recurring {
   nextDate    DateTime
   remindDays  Int       @default(1)
   active      Boolean   @default(true)
+  // The same details a regular entry has, applied each time the bill is added.
+  merchant      String?
+  note          String?
+  paymentMethod String?
+  tags          String[]  @default([])
+  toAccountId   String?   // TRANSFER
+  platform      String?   // INVEST: platform for a new holding (the title is the holding's name)
+  // Group bill: added as a group expense with these payers and split ({ payers, split }, member ids and minor units).
+  groupId       String?
+  groupData     Json?
 
   @@index([userId, nextDate])
 }

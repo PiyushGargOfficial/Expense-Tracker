@@ -16,7 +16,7 @@ Free-tier deploy: Vercel (app) + Neon (database).
 ## What is built (MVP)
 
 **Personal**: add/delete expense, income and transfers; accounts; categories and subcategories; monthly budgets
-with threshold alerts; recurring items (never posted automatically: tick the ones you paid and add them to expenses; highlighted when due soon); search, filter, sort;
+with threshold alerts; recurring items with the same options as a regular entry (expense, income, transfer or investment; category, the account it is paid with, merchant, note, tags; or a group expense with who pays and how it is split). They are never posted automatically: tick the ones you paid and add them to expenses; highlighted when due soon; search, filter, sort;
 CSV import/export; reports (by category, month over month, top merchants); account deletion.
 
 **Accounts**: balance per account (starting balance plus recorded transactions, per currency), and for credit

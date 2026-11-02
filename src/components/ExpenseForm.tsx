@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { CURRENCIES, minorToInput, parseToMinor } from "@/lib/money";
 import { computeShares, SplitError, type SplitInput } from "@/lib/split";
-import { editExpense } from "@/app/actions";
+import { addRecurring, editExpense } from "@/app/actions";
 import { CadAmountHint } from "@/components/CadHint";
 
 type M = { id: string; name: string };
@@ -30,7 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "ITEMIZED", label: "By item" },
 ];
 
-export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [] }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[] }) {
+export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [], recurring = false }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[]; recurring?: boolean }) {
   const router = useRouter();
   const all = members.map((m) => m.id);
   const init = initial?.split;
@@ -55,6 +55,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
 
   const [categoryId, setCategoryId] = useState(() => categories.find((c) => c.name.toLowerCase() === (initial?.category ?? "").toLowerCase())?.id ?? "");
   const [accountId, setAccountId] = useState(initial?.accountId ?? "");
+  const [frequency, setFrequency] = useState("MONTHLY");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const total = parseToMinor(amount, cur);
@@ -99,7 +100,17 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
     // `personal` lets your own share land in your Home totals under the category you picked.
     const data = { title: title.trim(), category: catName, amountMinor: total!, currency: cur, date, payers: built.payers, split: built.split, personal: { categoryId: categoryId || null, accountId: accountId || null, paymentMethod: accounts.find((a) => a.id === accountId)?.name ?? null } };
     try {
-      if (initial) {
+      if (recurring) {
+        // A recurring group bill: saved with its payers and split, and added as a group expense each time it is due.
+        const r = await addRecurring({
+          type: "EXPENSE", title: data.title, amount: minorToInput(total!, cur), currency: cur, frequency, nextDate: date,
+          categoryId: categoryId || null, accountId: accountId || null, paymentMethod: data.personal.paymentMethod,
+          group: { groupId, payers: built.payers, split: built.split },
+        });
+        if (!r.ok) { setError(r.error); return; }
+        setTitle(""); setAmount("");
+        router.refresh();
+      } else if (initial) {
         await editExpense(groupId, initial.expenseId, data);
         router.push(`/groups/${groupId}`);
       } else {
@@ -125,7 +136,12 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
         <select className="input w-24" aria-label="Currency" value={cur} onChange={(e) => setCur(e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
       </div>
       <CadAmountHint amount={amount} currency={cur} />
-      <input type="date" className="input" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
+      {recurring && (
+        <select className="input" aria-label="Frequency" value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+          <option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="BIWEEKLY">Every 2 weeks (biweekly)</option><option value="MONTHLY">Monthly</option><option value="YEARLY">Yearly</option>
+        </select>
+      )}
+      <input type="date" className="input" aria-label={recurring ? "Next date" : "Date"} value={date} onChange={(e) => setDate(e.target.value)} />
       {categories.length > 0 && (
         <select className="input" aria-label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
           <option value="">No category</option>
@@ -210,7 +226,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
       )}
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <button className="btn w-full" disabled={busy}>{initial ? "Save changes" : "Add expense"}</button>
+      <button className="btn w-full" disabled={busy}>{recurring ? "Add recurring bill" : initial ? "Save changes" : "Add expense"}</button>
     </form>
   );
 }

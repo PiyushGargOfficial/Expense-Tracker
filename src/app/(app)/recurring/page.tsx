@@ -1,22 +1,37 @@
-import CadHint from "@/components/CadHint";
+import AddSelectedForm from "@/components/AddSelectedForm";
+import RecurringForm from "@/components/RecurringForm";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { CURRENCIES, formatMinor } from "@/lib/money";
-import { addRecurring, addSelectedRecurring, deleteRecurring } from "@/app/actions";
+import { formatMinor } from "@/lib/money";
+import { computeShares, type SplitInput } from "@/lib/split";
+import { deleteRecurring } from "@/app/actions";
 
 const nowMs = () => Date.now();
 
 export default async function Recurring() {
   const user = await requireUser();
-  const [items, categories] = await Promise.all([
+  const [items, categories, accounts, memberships] = await Promise.all([
     db.recurring.findMany({ where: { userId: user.id }, orderBy: { nextDate: "asc" }, include: { category: true } }),
-    db.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
+    db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
+    db.account.findMany({ where: { userId: user.id, archived: false }, orderBy: { name: "asc" } }),
+    db.member.findMany({ where: { userId: user.id, left: false }, include: { group: { include: { members: { where: { left: false }, orderBy: { name: "asc" } } } } } }),
   ]);
+  const groups = memberships.map((m) => ({ id: m.group.id, name: m.group.name, meId: m.id, defaultCurrency: m.group.defaultCurrency, members: m.group.members.map((x) => ({ id: x.id, name: x.name })) }));
+  const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.name;
+  const groupName = (id: string | null) => groups.find((g) => g.id === id)?.name;
+  const typeLabel = { EXPENSE: "", INCOME: "Income", TRANSFER: "Transfer", INVEST: "Invested" } as const;
   const soon = nowMs();
   // Average cost per month: weekly and biweekly items cost 52/12 and 26/12 payments a month, yearly ones 1/12.
   const perMonth = { DAILY: 365 / 12, WEEKLY: 52 / 12, BIWEEKLY: 26 / 12, MONTHLY: 1, YEARLY: 1 / 12 } as const;
   const monthly: Record<string, number> = {};
-  for (const r of items) monthly[r.currency] = (monthly[r.currency] ?? 0) + r.amountMinor * perMonth[r.frequency];
+  // Only what you spend counts: income, transfers and investments are not costs, and a group bill counts your own share.
+  const myCost = (r: (typeof items)[number]) => {
+    const g = r.groupData as { payers: Record<string, number>; split: SplitInput } | null;
+    const me = groups.find((x) => x.id === r.groupId)?.meId;
+    if (!g || !me) return r.amountMinor;
+    try { return computeShares(r.amountMinor, g.split, Object.keys(g.payers), r.currency)[me] ?? 0; } catch { return r.amountMinor; }
+  };
+  for (const r of items) if (r.type === "EXPENSE") monthly[r.currency] = (monthly[r.currency] ?? 0) + myCost(r) * perMonth[r.frequency];
   const totals = Object.entries(monthly).map(([cur, v]) => [cur, Math.round(v)] as const);
   return (
     <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
@@ -28,11 +43,11 @@ export default async function Recurring() {
         ) : (
           <>
             {totals.map(([cur, v]) => <div key={cur} className="text-2xl font-semibold">{formatMinor(v, cur)}</div>)}
-            <p className="text-xs text-muted">{items.length} recurring {items.length === 1 ? "bill" : "bills"}. Weekly, biweekly and yearly bills are averaged into a monthly amount, so a biweekly bill counts 26/12 times a month.</p>
+            <p className="text-xs text-muted">{items.length} recurring {items.length === 1 ? "bill" : "bills"}. Income, transfers and investments are not counted, and a group bill counts your share. Weekly, biweekly and yearly bills are averaged into a monthly amount, so a biweekly bill counts 26/12 times a month.</p>
           </>
         )}
       </section>
-      <form action={addSelectedRecurring} className="space-y-2">
+      <AddSelectedForm hasItems={items.length > 0}>
         <ul className="card divide-y divide-line !p-0">
           {items.length === 0 && <li className="p-4 text-muted">Nothing recurring yet.</li>}
           {items.map((r) => {
@@ -42,6 +57,10 @@ export default async function Recurring() {
                 <input type="checkbox" name="ids" value={r.id} id={`rec-${r.id}`} className="size-5 shrink-0" aria-label={`Select ${r.title}`} />
                 <label htmlFor={`rec-${r.id}`} className="min-w-0 flex-1">
                   <div>{r.title} <span className="text-xs text-muted">{r.frequency.toLowerCase()}</span></div>
+                  <div className="text-xs text-muted">
+                    {[typeLabel[r.type], groupName(r.groupId) ? `Group: ${groupName(r.groupId)}` : r.groupId ? "Group" : "", r.category?.name, accountName(r.accountId) && `${r.type === "INCOME" ? "Into" : "With"} ${accountName(r.accountId)}`, r.type === "TRANSFER" && accountName(r.toAccountId) ? `To ${accountName(r.toAccountId)}` : "", r.merchant, r.platform, r.tags.length ? r.tags.map((t) => `#${t}`).join(" ") : ""].filter(Boolean).join(" · ")}
+                    {r.note ? ` — ${r.note}` : ""}
+                  </div>
                   <div className={`text-xs ${days <= r.remindDays ? "font-medium text-amber-600" : "text-muted"}`}>
                     {days <= 0 ? "Due now · " : days <= r.remindDays ? "Due soon · " : "Next: "}{r.nextDate.toISOString().slice(0, 10)}
                   </div>
@@ -54,24 +73,8 @@ export default async function Recurring() {
             );
           })}
         </ul>
-        {items.length > 0 && (
-          <>
-            <button className="btn w-full">Add selected to expenses</button>
-            <p className="text-xs text-muted">Recurring bills are not added to your expenses on their own. Tick the ones you have paid and add them; each moves on to its next date.</p>
-          </>
-        )}
-      </form>
-      <form action={addRecurring} className="card grid grid-cols-2 gap-2">
-        <h2 className="col-span-2 font-semibold">Add recurring expense</h2>
-        <input name="title" className="input col-span-2" placeholder="Netflix, Rent…" aria-label="Title" required />
-        <input name="amount" inputMode="decimal" className="input" placeholder="Amount" aria-label="Amount" required />
-        <select name="currency" className="input" aria-label="Currency" defaultValue={user.defaultCurrency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
-        <CadHint amountName="amount" className="col-span-2" />
-        <select name="frequency" className="input" aria-label="Frequency" defaultValue="MONTHLY"><option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="BIWEEKLY">Every 2 weeks (biweekly)</option><option value="MONTHLY">Monthly</option><option value="YEARLY">Yearly</option></select>
-        <input name="nextDate" type="date" className="input" aria-label="Next date" required />
-        <select name="categoryId" className="input col-span-2" aria-label="Category"><option value="">No category</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        <button className="btn col-span-2">Add</button>
-      </form>
+      </AddSelectedForm>
+      <RecurringForm categories={categories.map((c) => ({ id: c.id, name: c.name }))} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} groups={groups} currency={user.defaultCurrency} />
     </div>
   );
 }
