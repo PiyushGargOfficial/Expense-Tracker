@@ -86,3 +86,5 @@ offline editing of existing records, full-text i18n.
 **Other currencies**: any amount in a currency other than CAD shows its Canadian-dollar equivalent in brackets, and forms
 show the equivalent and the current rate as you type. Rates come from open.er-api.com (cached for 6 hours, with built-in
 approximations if the service is down) and are for display only: nothing is converted or added across currencies.
+
+Layouts are checked at iPhone 17 Pro size (402 x 874): pages never scroll sideways, stats stack, and the bottom tab bar fits all eight sections.

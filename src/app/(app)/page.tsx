@@ -39,7 +39,7 @@ export default async function Home() {
 
   return (
     // One column on phones; on laptops and larger, entry + totals on the left, balances + history on the right.
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
      <div className="space-y-5 lg:sticky lg:top-8">
       <QuickAdd categories={categories} accounts={accounts} currency={user.defaultCurrency} groups={groupOpts} holdings={holdings} />
 
@@ -116,15 +116,15 @@ export default async function Home() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
                 <span className={t.type === "INCOME" ? "text-emerald-600" : t.type === "INVEST" ? "text-sky-600" : ""}>{t.type === "INCOME" ? "+" : t.type === "EXPENSE" ? "-" : ""}{formatMinor(t.amountMinor, t.currency)}</span>
                 {t.groupExpense ? (
                   <Link className="-m-2 p-2 text-xs text-muted underline" href={`/groups/${t.groupExpense.group.id}/expenses/${t.groupExpenseId}`}>Open</Link>
                 ) : (
-                  <>
+                  <div className="flex items-center gap-4 sm:gap-3">
                     <Link className="-m-2 p-2 text-xs text-muted underline" href={`/transactions/${t.id}`}>Edit</Link>
                     <form action={deleteTxn.bind(null, t.id)}><button className="-m-2 p-2 text-xs text-muted underline" aria-label="Delete">Delete</button></form>
-                  </>
+                  </div>
                 )}
               </div>
             </li>

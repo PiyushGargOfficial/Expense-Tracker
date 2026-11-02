@@ -54,7 +54,7 @@ export default async function Accounts() {
   });
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Accounts</h1>
 
       <section className="card space-y-2 lg:col-span-2" aria-label="Summary">
@@ -63,10 +63,10 @@ export default async function Accounts() {
           <p className="text-muted">No accounts yet. Add one below.</p>
         ) : (
           Object.entries(totals).map(([cur, t]) => (
-            <div key={cur} className="grid grid-cols-3 gap-2 text-sm">
-              <div><div className="text-xs text-muted">You have ({cur})</div><div className="text-lg font-semibold">{formatMinor(t.have, cur)}</div></div>
-              <div><div className="text-xs text-muted">You owe ({cur})</div><div className={`text-lg font-semibold ${t.owe ? "text-red-600" : ""}`}>{formatMinor(t.owe, cur)}</div></div>
-              <div><div className="text-xs text-muted">Net ({cur})</div><div className="text-lg font-semibold">{formatMinor(t.have - t.owe, cur)}</div></div>
+            <div key={cur} className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-3 sm:gap-2">
+              <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">You have ({cur})</div><div className="text-right text-lg font-semibold sm:text-left">{formatMinor(t.have, cur)}</div></div>
+              <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">You owe ({cur})</div><div className={`text-right text-lg font-semibold sm:text-left ${t.owe ? "text-red-600" : ""}`}>{formatMinor(t.owe, cur)}</div></div>
+              <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Net ({cur})</div><div className="text-right text-lg font-semibold sm:text-left">{formatMinor(t.have - t.owe, cur)}</div></div>
             </div>
           ))
         )}
@@ -148,8 +148,8 @@ export default async function Accounts() {
                       const incoming = t.toAccountId === a.id || (t.type === "INCOME" && t.accountId === a.id);
                       return (
                         <li key={t.id} className="flex justify-between gap-2 py-1.5">
-                          <span className="min-w-0 truncate">{t.merchant || t.note || t.category?.name || (t.type === "TRANSFER" ? "Transfer" : "Transaction")} <span className="text-xs text-muted">{t.date.toISOString().slice(0, 10)}</span></span>
-                          <span className={incoming ? "text-emerald-600" : ""}>{incoming ? "+" : "-"}{formatMinor(t.amountMinor, t.currency)}</span>
+                          <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate">{t.merchant || t.note || t.category?.name || (t.type === "TRANSFER" ? "Transfer" : "Transaction")}</span> <span className="shrink-0 text-xs text-muted">{t.date.toISOString().slice(0, 10)}</span></span>
+                          <span className={`shrink-0 ${incoming ? "text-emerald-600" : ""}`}>{incoming ? "+" : "-"}{formatMinor(t.amountMinor, t.currency)}</span>
                         </li>
                       );
                     })}

@@ -45,7 +45,7 @@ export default async function Investments() {
   });
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Investments</h1>
 
       <section className="card space-y-3 lg:col-span-2" aria-label="Overview">
@@ -54,10 +54,10 @@ export default async function Investments() {
           <p className="text-muted">No investments yet. Add one below, then set goals to track.</p>
         ) : (
           Object.entries(totals).map(([cur, t]) => (
-            <div key={cur} className="grid grid-cols-3 gap-2 text-sm">
-              <div><div className="text-xs text-muted">Invested ({cur})</div><div className="text-lg font-semibold">{formatMinor(t.investedMinor, cur)}</div></div>
-              <div><div className="text-xs text-muted">Current value ({cur})</div><div className="text-lg font-semibold">{formatMinor(t.valueMinor, cur)}</div></div>
-              <div><div className="text-xs text-muted">Gain / loss ({cur})</div><div className={`text-lg font-semibold ${gainClass(t.gainMinor)}`}>{signed(t.gainMinor, cur)}<span className="text-sm">{pctText(t)}</span></div></div>
+            <div key={cur} className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-3 sm:gap-2">
+              <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Invested ({cur})</div><div className="text-right text-lg font-semibold sm:text-left">{formatMinor(t.investedMinor, cur)}</div></div>
+              <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Current value ({cur})</div><div className="text-right text-lg font-semibold sm:text-left">{formatMinor(t.valueMinor, cur)}</div></div>
+              <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Gain / loss ({cur})</div><div className={`text-right text-lg font-semibold sm:text-left ${gainClass(t.gainMinor)}`}>{signed(t.gainMinor, cur)}<span className="text-sm">{pctText(t)}</span></div></div>
             </div>
           ))
         )}
@@ -165,10 +165,10 @@ export default async function Investments() {
                       </InvestmentEdit>
                     </div>
                     <div className="text-xs text-muted">{h.platform} · {assetLabel(h.assetType)}{goalName(h.goalId) ? ` · Goal: ${goalName(h.goalId)}` : ""}</div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
-                      <div><div className="text-xs text-muted">Invested</div>{formatMinor(h.investedMinor, h.currency)}</div>
-                      <div><div className="text-xs text-muted">Value</div>{formatMinor(h.valueMinor, h.currency)}</div>
-                      <div><div className="text-xs text-muted">Gain / loss</div><span className={gainClass(gain)}>{signed(gain, h.currency)}</span></div>
+                    <div className="mt-2 grid grid-cols-1 gap-1 text-sm sm:grid-cols-3 sm:gap-2">
+                      <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Invested</div>{formatMinor(h.investedMinor, h.currency)}</div>
+                      <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Value</div>{formatMinor(h.valueMinor, h.currency)}</div>
+                      <div className="flex items-baseline justify-between gap-2 sm:block"><div className="text-xs text-muted">Gain / loss</div><span className={gainClass(gain)}>{signed(gain, h.currency)}</span></div>
                     </div>
                     {addedBy(h.id) > 0 && (
                       <p className="mt-1 text-xs text-muted">Already invested {formatMinor(Math.max(0, h.investedMinor - addedBy(h.id)), h.currency)} · added with the Invest tab {formatMinor(addedBy(h.id), h.currency)}</p>

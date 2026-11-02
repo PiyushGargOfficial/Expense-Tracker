@@ -12,7 +12,7 @@ export default async function Settings() {
     db.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
   ]);
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Settings</h1>
 
       <section className="card space-y-2">

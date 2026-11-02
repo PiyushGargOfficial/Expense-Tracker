@@ -34,7 +34,7 @@ export default async function Recurring() {
   for (const r of items) if (r.type === "EXPENSE") monthly[r.currency] = (monthly[r.currency] ?? 0) + myCost(r) * perMonth[r.frequency];
   const totals = Object.entries(monthly).map(([cur, v]) => [cur, Math.round(v)] as const);
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Recurring &amp; subscriptions</h1>
       <section className="card space-y-1 lg:col-span-2" aria-label="Monthly total of recurring bills">
         <h2 className="font-semibold">Total per month</h2>
@@ -65,7 +65,7 @@ export default async function Recurring() {
                     {days <= 0 ? "Due now · " : days <= r.remindDays ? "Due soon · " : "Next: "}{r.nextDate.toISOString().slice(0, 10)}
                   </div>
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
                   <span>{formatMinor(r.amountMinor, r.currency)}</span>
                   <button formAction={deleteRecurring.bind(null, r.id)} className="-m-2 p-2 text-xs text-muted underline">Remove</button>
                 </div>

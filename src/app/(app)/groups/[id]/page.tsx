@@ -25,7 +25,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   const feed = [...expenses.map((e) => ({ t: e.date, k: "e" as const, e })), ...settlements.map((s) => ({ t: s.date, k: "s" as const, s }))].sort((a, b) => +b.t - +a.t);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
       <div className="flex items-start justify-between gap-3 lg:col-span-2">
         <div>
           <h1 className="text-xl font-bold">{group.name}</h1>

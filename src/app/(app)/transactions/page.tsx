@@ -25,7 +25,7 @@ export default async function Transactions({ searchParams }: { searchParams: Pro
   ]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">All transactions</h1>
       <form className="card grid grid-cols-2 gap-2 lg:sticky lg:top-8">
         <input name="q" defaultValue={sp.q} className="input col-span-2" placeholder="Search note, merchant, tag" aria-label="Search" />
@@ -44,7 +44,7 @@ export default async function Transactions({ searchParams }: { searchParams: Pro
         {txns.map((t) => (
           <li key={t.id} className="flex justify-between gap-2 px-4 py-2.5">
             <div className="min-w-0"><div className="truncate">{t.note || t.merchant || t.category?.name || t.type.toLowerCase()}</div><div className="text-xs text-muted">{t.date.toISOString().slice(0, 10)} · {t.type === "INVEST" ? "Invested" : t.category?.name ?? "Uncategorised"}{t.groupExpense ? ` · ${t.groupExpense.group.name}` : ""}</div></div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
               <span>{formatMinor(t.amountMinor, t.currency)}</span>
               <Link className="-m-2 p-2 text-xs text-muted underline" href={`/transactions/${t.id}`}>{t.groupExpenseId ? "Open" : "Edit"}</Link>
             </div>

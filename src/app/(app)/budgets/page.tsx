@@ -43,7 +43,7 @@ export default async function Budgets() {
     return `/transactions?${q}`;
   };
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Monthly budgets</h1>
       <ul className="space-y-3">
         {budgets.length === 0 && <li className="text-muted">No budgets yet.</li>}

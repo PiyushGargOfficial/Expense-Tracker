@@ -22,7 +22,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
   const canEdit = e.createdById === user.id || me.role === "ADMIN";
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
      <div className="min-w-0 space-y-5">
       <div>
         <h1 className="text-xl font-bold">{e.title}</h1>

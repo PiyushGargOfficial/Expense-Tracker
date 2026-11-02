@@ -21,7 +21,7 @@ export default async function Groups() {
   );
   const money = (r: Record<string, number>) => Object.entries(r).map(([c, v]) => formatMinor(v, c)).join(" + ");
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
       <h1 className="text-xl font-bold lg:col-span-2">Groups</h1>
       <ul className="card divide-y divide-line !p-0">
         {memberships.length === 0 && <li className="p-4 text-muted">No groups yet. Create one for a trip, flat or couple.</li>}

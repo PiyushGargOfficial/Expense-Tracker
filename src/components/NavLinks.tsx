@@ -30,9 +30,9 @@ export default function NavLinks({ variant }: { variant: "bottom" | "side" }) {
     return (
       <ul className="flex">
         {NAV.map((n) => (
-          <li key={n.href} className="flex-1">
+          <li key={n.href} className="min-w-0 flex-1">
             <Link href={n.href} aria-current={active(n.href) ? "page" : undefined}
-              className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] ${active(n.href) ? "font-semibold text-emerald-600" : "text-muted"}`}>
+              className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] leading-tight tracking-tight min-[400px]:text-[10.5px] ${active(n.href) ? "font-semibold text-emerald-600" : "text-muted"}`}>
               <Icon d={n.d} />
               {n.short ?? n.label}
             </Link>

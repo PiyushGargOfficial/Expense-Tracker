@@ -41,7 +41,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 
   return (
-    <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:items-start">
       <div className="flex flex-wrap items-center justify-between gap-2 xl:col-span-2">
         <h1 className="text-xl font-bold">Reports ({currency})</h1>
         <div className="flex gap-2 text-sm">{otherCurrencies.map((c) => <a key={c} className={c === currency ? "font-semibold" : "underline"} aria-current={c === currency ? "true" : undefined} href={`/reports?cur=${c}`}>{c}</a>)}</div>
