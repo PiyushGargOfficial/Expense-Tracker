@@ -94,3 +94,4 @@ Layouts are checked at iPhone 17 Pro size (402 x 874): pages never scroll sidewa
 - Recent on Home lists the most recently added entries first.
 - Recurring bills, group bills included, are added only when you tick them and press Add selected; a group bill then becomes a group expense with its saved payers and split.
 - A credit card's annual fee renewal date is optional; without one it is set a year from today.
+- Auto category: an expense or income saved **without** a category gets one assigned when it is saved: first the category you used before for the same merchant (then the same note), else a built-in word list (Netflix, coffee, rent, Uber…) matched to your own category names. A category you pick is never changed, nothing is guessed when nothing fits, and no text leaves the app (`lib/categorize.ts`, `lib/autoCategory.ts`). It applies to quick add, recurring bills, CSV import and your share of a group expense; editing an entry does not re-categorise it.

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { autoCategoryId } from "@/lib/autoCategory";
 
 type Client = Prisma.TransactionClient | typeof db;
 
@@ -33,6 +34,9 @@ export async function syncMirrors(c: Client, expenseId: string, hints?: Personal
     const categoryId = mine?.categoryId && (await c.category.count({ where: { id: mine.categoryId, userId: m.userId } })) ? mine.categoryId : undefined;
     const accountId = mine?.accountId && (await c.account.count({ where: { id: mine.accountId, userId: m.userId } })) ? mine.accountId : undefined;
     const byName = !categoryId && e.category ? await c.category.findFirst({ where: { userId: m.userId, name: { equals: e.category, mode: "insensitive" } } }) : null;
+    // A new share with no category chosen or named gets one suggested from this person's past entries and a word list.
+    const isNew = !categoryId && !byName && !(await c.transaction.count({ where: { userId: m.userId, groupExpenseId: e.id } }));
+    const auto = isNew ? await autoCategoryId(c, m.userId, { type: "EXPENSE", note: mine?.note || e.title }) : null;
 
     await c.transaction.upsert({
       where,
@@ -53,7 +57,7 @@ export async function syncMirrors(c: Client, expenseId: string, hints?: Personal
         currency: e.currency,
         date: e.date,
         note: mine?.note || e.title,
-        categoryId: categoryId ?? byName?.id ?? null,
+        categoryId: categoryId ?? byName?.id ?? auto,
         accountId: accountId ?? null,
         paymentMethod: mine?.paymentMethod ?? null,
         groupExpenseId: e.id,

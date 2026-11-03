@@ -20,6 +20,7 @@ import { isLimited, recordHit } from "@/lib/ratelimit";
 import { passwordStatus } from "@/lib/credentials";
 import { syncGroupMirrors } from "@/lib/mirror";
 import { addRecurringToExpenses } from "@/lib/recurring";
+import { autoCategoryId } from "@/lib/autoCategory";
 import { TOTP_REQUIRED } from "@/lib/authMessages";
 import { passwordProblem } from "@/lib/password";
 import { ASSET_VALUES } from "@/lib/investments";
@@ -461,7 +462,7 @@ export async function importCsv(_: string | undefined, f: FormData) {
     await db.transaction.upsert({
       where: { userId_clientId: { userId: u.id, clientId } },
       update: {},
-      create: { userId: u.id, clientId, type: t as "EXPENSE", amountMinor, currency: cur, date, note: r[col("note")] || null, categoryId: cats.find((c) => c.name.toLowerCase() === catName)?.id ?? null },
+      create: { userId: u.id, clientId, type: t as "EXPENSE", amountMinor, currency: cur, date, note: r[col("note")] || null, categoryId: cats.find((c) => c.name.toLowerCase() === catName)?.id ?? (await autoCategoryId(db, u.id, { type: t, note: r[col("note")] })) },
     });
     ok++;
   }

@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { computeShares, validatePayers, type SplitInput } from "@/lib/split";
 import { syncMirrors } from "@/lib/mirror";
+import { autoCategoryId } from "@/lib/autoCategory";
 import { PAYMENT_VALUES, paymentLabel } from "@/lib/payment";
 
 const minor = z.number().int().positive().max(1_000_000_000_00);
@@ -43,7 +44,8 @@ export async function createTxn(userId: string, clientId: string, raw: unknown) 
   const existing = await db.transaction.findUnique({ where: { userId_clientId: { userId, clientId } } });
   if (existing) return existing; // already applied
   const { platform, ...data } = d;
-  if (d.type !== "INVEST") return db.transaction.create({ data: { ...data, tags: d.tags, userId, clientId } });
+  // Saved without a category: pick one from what the user chose for the same merchant or note before, else a built-in word list.
+  if (d.type !== "INVEST") return db.transaction.create({ data: { ...data, categoryId: d.categoryId || (await autoCategoryId(db, userId, d)), tags: d.tags, userId, clientId } });
 
   // An investment is matched by name (the note) and currency: it adds to that holding, or creates it.
   const name = (d.note ?? "").trim().replace(/\s+/g, " ");
