@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { CURRENCIES, minorToInput, parseToMinor } from "@/lib/money";
 import { computeShares, SplitError, type SplitInput } from "@/lib/split";
-import { addRecurring, editExpense, updateRecurring } from "@/app/actions";
+import { addRecurring, editExpense, postRecurringGroupExpense, updateRecurring } from "@/app/actions";
 import { CadAmountHint } from "@/components/CadHint";
 
 type M = { id: string; name: string };
@@ -30,7 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "ITEMIZED", label: "By item" },
 ];
 
-export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [], recurring = false, recurringId, initialFrequency }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[]; recurring?: boolean; recurringId?: string; initialFrequency?: string }) {
+export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [], recurring = false, recurringId, initialFrequency, fromRecurringId }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[]; recurring?: boolean; recurringId?: string; initialFrequency?: string; fromRecurringId?: string }) {
   const router = useRouter();
   const all = members.map((m) => m.id);
   const init = initial?.split;
@@ -112,6 +112,9 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
         if (recurringId) { router.push("/recurring"); router.refresh(); return; }
         setTitle(""); setAmount("");
         router.refresh();
+      } else if (fromRecurringId) {
+        await postRecurringGroupExpense(fromRecurringId, data);
+        router.push(`/groups/${groupId}`);
       } else if (initial) {
         await editExpense(groupId, initial.expenseId, data);
         router.push(`/groups/${groupId}`);
@@ -228,7 +231,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
       )}
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <button className="btn w-full" disabled={busy}>{recurring ? (recurringId ? "Save changes" : "Add recurring bill") : initial ? "Save changes" : "Add expense"}</button>
+      <button className="btn w-full" disabled={busy}>{recurring ? (recurringId ? "Save changes" : "Add recurring bill") : initial && !fromRecurringId ? "Save changes" : "Add expense"}</button>
     </form>
   );
 }

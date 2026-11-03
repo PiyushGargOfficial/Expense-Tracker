@@ -92,3 +92,5 @@ Layouts are checked at iPhone 17 Pro size (402 x 874): pages never scroll sidewa
 
 - Recurring bills can be edited (Edit on the Recurring tab). A credit card's annual fee and renewal date (Accounts, Edit) are kept as a yearly bill in Recurring, so changing either place updates the other; clearing the fee removes the bill.
 - Recent on Home lists the most recently added entries first.
+- A recurring group bill is never posted to the group on its own, and has no tick box: **Review & add** opens the group's add-expense form filled in from the bill, you can change anything for that time, and adding it creates the group expense and moves the bill to its next date.
+- A credit card's annual fee renewal date is optional; without one it is set a year from today.

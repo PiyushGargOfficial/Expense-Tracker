@@ -104,10 +104,10 @@ export default function AccountForm({ account, defaultCurrency, onDone }: { acco
             <input id={`fee-${id}`} name="annualFee" inputMode="decimal" className="input" defaultValue={account?.annualFeeMinor ? minorToInput(account.annualFeeMinor, cur) : ""} placeholder="120.00" onChange={clear} />
           </div>
           <div>
-            <label className="label" htmlFor={`renew-${id}`}>Fee renews on</label>
+            <label className="label" htmlFor={`renew-${id}`}>Fee renews on (optional)</label>
             <input id={`renew-${id}`} name="feeRenewal" type="date" className="input" defaultValue={account?.feeRenewal ?? ""} onChange={clear} />
           </div>
-          <p className="col-span-2 -mt-1 text-xs text-muted">The annual fee is added to Recurring as a yearly bill paid with this card. Clear the fee to remove it.</p>
+          <p className="col-span-2 -mt-1 text-xs text-muted">The annual fee is added to Recurring as a yearly bill paid with this card. Without a date it is set a year from today. Clear the fee to remove it.</p>
         </>
       )}
 

@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { requireUser, requireMember } from "@/lib/session";
 import { CURRENCIES, formatPlain, parseToMinor } from "@/lib/money";
 import { KIND_VALUES, deltaFor, parseAprBps, parseSigned, type AccountKindValue } from "@/lib/accounts";
-import { deleteGroup, deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense, updateTxn } from "@/lib/ops";
+import { createGroupExpense, deleteGroup, deleteGroupExpense, deleteSettlement, splitSchema, updateGroupExpense, updateTxn } from "@/lib/ops";
 import { computeShares, validatePayers, type SplitInput } from "@/lib/split";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -19,7 +19,7 @@ import { randomBytes } from "node:crypto";
 import { isLimited, recordHit } from "@/lib/ratelimit";
 import { passwordStatus } from "@/lib/credentials";
 import { syncGroupMirrors } from "@/lib/mirror";
-import { addRecurringToExpenses } from "@/lib/recurring";
+import { addRecurringToExpenses, advance } from "@/lib/recurring";
 import { TOTP_REQUIRED } from "@/lib/authMessages";
 import { passwordProblem } from "@/lib/password";
 import { ASSET_VALUES } from "@/lib/investments";
@@ -168,10 +168,14 @@ export async function saveAccount(id: string | null, f: FormData): Promise<SaveR
     const fee = optMoney("annualFee");
     if (fee === "bad") return { ok: false, error: `Annual fee must be a number in ${currency}` };
     if (fee) {
-      if (!s(f, "feeRenewal")) return { ok: false, error: "Pick the date the annual fee renews" };
-      feeRenewal = new Date(`${s(f, "feeRenewal")}T00:00:00.000Z`);
-      if (Number.isNaN(+feeRenewal)) return { ok: false, error: "Pick a valid renewal date" };
       feeMinor = fee;
+      if (s(f, "feeRenewal")) {
+        feeRenewal = new Date(`${s(f, "feeRenewal")}T00:00:00.000Z`);
+        if (Number.isNaN(+feeRenewal)) return { ok: false, error: "Pick a valid renewal date" };
+      }
+      // No date given: keep the one already saved, or assume it renews a year from today.
+      else if (existing) feeRenewal = (await db.recurring.findFirst({ where: { userId: u.id, feeAccountId: existing.id }, select: { nextDate: true } }))?.nextDate ?? null;
+      if (!feeRenewal) { feeRenewal = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`); feeRenewal.setUTCFullYear(feeRenewal.getUTCFullYear() + 1); }
     }
   }
 
@@ -415,6 +419,17 @@ export async function updateRecurring(id: string, raw: unknown): Promise<SaveRes
   await db.recurring.updateMany({ where: { id, userId: u.id }, data: r.data });
   revalidatePath("/recurring");
   return { ok: true };
+}
+
+/** Adds a recurring group bill as a group expense after the user has reviewed (and maybe changed) it in the add-expense form. */
+export async function postRecurringGroupExpense(recurringId: string, payload: unknown) {
+  const u = await requireUser();
+  const r = await db.recurring.findFirst({ where: { id: recurringId, userId: u.id, active: true, groupId: { not: null } } });
+  if (!r || !r.groupId) throw new Error("Recurring bill not found");
+  await requireMember(r.groupId, u.id);
+  await createGroupExpense({ id: u.id, name: u.name }, r.groupId, `rec:${r.id}:${r.nextDate.toISOString().slice(0, 10)}`, payload);
+  await db.recurring.update({ where: { id: r.id }, data: { nextDate: advance(r.nextDate, r.frequency) } });
+  for (const p of ["/recurring", "/", "/transactions", "/budgets", "/reports", "/groups", `/groups/${r.groupId}`]) revalidatePath(p);
 }
 
 /** Adds the ticked recurring bills (one occurrence each). Recurring bills are never posted automatically. Returns a message when some could not be added. */
