@@ -55,7 +55,7 @@ export default async function Recurring() {
             const days = Math.ceil((+r.nextDate - soon) / 86400000);
             return (
               <li key={r.id} className="flex items-center gap-3 px-4 py-2.5">
-                {r.groupId && groupName(r.groupId) ? <span className="size-5 shrink-0" aria-hidden /> : <input type="checkbox" name="ids" value={r.id} id={`rec-${r.id}`} className="size-5 shrink-0" aria-label={`Select ${r.title}`} />}
+                <input type="checkbox" name="ids" value={r.id} id={`rec-${r.id}`} className="size-5 shrink-0" aria-label={`Select ${r.title}`} />
                 <label htmlFor={`rec-${r.id}`} className="min-w-0 flex-1">
                   <div>{r.title} <span className="text-xs text-muted">{r.frequency.toLowerCase()}</span></div>
                   <div className="text-xs text-muted">
@@ -69,7 +69,6 @@ export default async function Recurring() {
                 <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
                   <span>{formatMinor(r.amountMinor, r.currency)}</span>
                   <div className="flex items-center gap-4 sm:gap-3">
-                    {r.groupId && groupName(r.groupId) && <Link href={`/groups/${r.groupId}/add?recurring=${r.id}`} className="-m-2 p-2 text-xs font-medium underline">Review &amp; add</Link>}
                     <Link href={`/recurring/${r.id}`} className="-m-2 p-2 text-xs text-muted underline">Edit</Link>
                     <button formAction={deleteRecurring.bind(null, r.id)} className="-m-2 p-2 text-xs text-muted underline">Remove</button>
                   </div>
