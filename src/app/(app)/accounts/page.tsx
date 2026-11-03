@@ -13,8 +13,9 @@ export default async function Accounts() {
   const user = await requireUser();
   const today = new Date();
   const { start, end } = monthRange(today);
-  const [accounts, txns] = await Promise.all([
+  const [accounts, feeBills, txns] = await Promise.all([
     db.account.findMany({ where: { userId: user.id }, orderBy: [{ kind: "asc" }, { name: "asc" }] }),
+    db.recurring.findMany({ where: { userId: user.id, feeAccountId: { not: null } }, select: { feeAccountId: true, amountMinor: true, nextDate: true } }),
     db.transaction.findMany({
       where: { userId: user.id, deletedAt: null, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
       orderBy: { date: "desc" },
@@ -47,10 +48,12 @@ export default async function Accounts() {
   }
   const dueSoon = active.filter((r) => r.credit?.dueSoon);
 
+  const fee = (accountId: string) => feeBills.find((b) => b.feeAccountId === accountId);
   const values = (r: (typeof rows)[number]): AccountValues => ({
     id: r.a.id, name: r.a.name, kind: r.a.kind, currency: r.a.currency, institution: r.a.institution, last4: r.a.last4, balance: r.balance,
     creditLimitMinor: r.a.creditLimitMinor, statementDay: r.a.statementDay, dueDay: r.a.dueDay, aprBps: r.a.aprBps, minPaymentMinor: r.a.minPaymentMinor,
     minOwedMinor: r.a.kind === "CREDIT" ? Math.max(0, -r.balance) : undefined,
+    annualFeeMinor: fee(r.a.id)?.amountMinor ?? null, feeRenewal: fee(r.a.id)?.nextDate.toISOString().slice(0, 10) ?? null,
   });
 
   return (
@@ -116,6 +119,7 @@ export default async function Accounts() {
                     {a.minPaymentMinor != null && <Stat label="Minimum payment" value={formatMinor(a.minPaymentMinor, cur)} />}
                     {c.nextStatement && <Stat label="Next statement" value={fmtDate(c.nextStatement)} />}
                     {c.paidSinceStatement != null && <Stat label="Paid since last statement" value={formatMinor(c.paidSinceStatement, cur)} />}
+                    {fee(a.id) && <Stat label="Annual fee" value={`${formatMinor(fee(a.id)!.amountMinor, cur)}, renews ${fee(a.id)!.nextDate.toISOString().slice(0, 10)}`} />}
                     {a.aprBps != null && <Stat label="Interest rate" value={`${(a.aprBps / 100).toFixed(2)}% a year`} />}
                     {c.monthlyInterest != null && <Stat label="Interest if unpaid, about" value={`${formatMinor(c.monthlyInterest, cur)} a month`} />}
                     <Stat label="Spent this month" value={formatMinor(r.spent, cur)} />

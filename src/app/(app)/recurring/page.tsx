@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AddSelectedForm from "@/components/AddSelectedForm";
 import RecurringForm from "@/components/RecurringForm";
 import { db } from "@/lib/db";
@@ -67,7 +68,10 @@ export default async function Recurring() {
                 </label>
                 <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
                   <span>{formatMinor(r.amountMinor, r.currency)}</span>
-                  <button formAction={deleteRecurring.bind(null, r.id)} className="-m-2 p-2 text-xs text-muted underline">Remove</button>
+                  <div className="flex items-center gap-4 sm:gap-3">
+                    <Link href={`/recurring/${r.id}`} className="-m-2 p-2 text-xs text-muted underline">Edit</Link>
+                    <button formAction={deleteRecurring.bind(null, r.id)} className="-m-2 p-2 text-xs text-muted underline">Remove</button>
+                  </div>
                 </div>
               </li>
             );

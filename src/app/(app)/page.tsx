@@ -14,7 +14,7 @@ export default async function Home() {
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
     db.account.findMany({ where: { userId: user.id, archived: false } }),
     db.transaction.findMany({
-      where: { userId: user.id, deletedAt: null }, orderBy: { date: "desc" }, take: 10,
+      where: { userId: user.id, deletedAt: null }, orderBy: [{ createdAt: "desc" }, { date: "desc" }], take: 10,
       include: { category: true, account: true, groupExpense: { select: { amountMinor: true, currency: true, group: { select: { id: true, name: true } } } } },
     }),
     db.transaction.groupBy({ by: ["type", "currency"], where: { userId: user.id, deletedAt: null, date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),

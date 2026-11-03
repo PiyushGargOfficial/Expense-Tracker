@@ -162,9 +162,23 @@ export async function saveAccount(id: string | null, f: FormData): Promise<SaveR
   const last4 = s(f, "last4");
   if (last4 && !/^\d{4}$/.test(last4)) return { ok: false, error: "Last 4 digits must be exactly 4 numbers" };
 
+  // A credit card's annual fee and the date it renews. Saved as a yearly recurring bill on the card (see below).
+  let feeMinor: number | null = null, feeRenewal: Date | null = null;
+  if (credit) {
+    const fee = optMoney("annualFee");
+    if (fee === "bad") return { ok: false, error: `Annual fee must be a number in ${currency}` };
+    if (fee) {
+      if (!s(f, "feeRenewal")) return { ok: false, error: "Pick the date the annual fee renews" };
+      feeRenewal = new Date(`${s(f, "feeRenewal")}T00:00:00.000Z`);
+      if (Number.isNaN(+feeRenewal)) return { ok: false, error: "Pick a valid renewal date" };
+      feeMinor = fee;
+    }
+  }
+
   const fields = { name, kind, institution: s(f, "institution").slice(0, 60) || null, last4: last4 || null, creditLimitMinor, statementDay, dueDay, aprBps, minPaymentMinor };
+  let accountId = existing?.id ?? "";
   if (!existing) {
-    await db.account.create({ data: { userId: u.id, currency, openingMinor: balance, ...fields } });
+    accountId = (await db.account.create({ data: { userId: u.id, currency, openingMinor: balance, ...fields } })).id;
   } else {
     // Keep the transactions as they are: opening = what you say the balance is now, minus what they added up to.
     const txns = await db.transaction.findMany({ where: { userId: u.id, deletedAt: null, OR: [{ accountId: existing.id }, { toAccountId: existing.id }] }, select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true } });
@@ -177,8 +191,29 @@ export async function saveAccount(id: string | null, f: FormData): Promise<SaveR
     }
     await db.account.update({ where: { id: existing.id }, data: { openingMinor: balance - delta, ...fields } });
   }
-  revalidatePath("/accounts"); revalidatePath("/settings"); revalidatePath("/");
+  await syncAnnualFee(u.id, accountId, name, existing?.name, currency, feeMinor, feeRenewal);
+  revalidatePath("/accounts"); revalidatePath("/settings"); revalidatePath("/"); revalidatePath("/recurring");
   return { ok: true };
+}
+
+/**
+ * Keeps the card's annual fee in the Recurring tab as a yearly bill paid with that card. The fee and the renewal date
+ * are the bill's amount and next date, so editing either place shows in the other. No fee (or no longer a credit card) removes it.
+ */
+async function syncAnnualFee(userId: string, accountId: string, name: string, oldName: string | undefined, currency: string, feeMinor: number | null, renewal: Date | null) {
+  const linked = await db.recurring.findFirst({ where: { userId, feeAccountId: accountId } });
+  if (!feeMinor || !renewal) {
+    if (linked) await db.recurring.delete({ where: { id: linked.id } });
+    return;
+  }
+  const title = `${name} annual fee`;
+  if (linked) {
+    // A title you changed by hand in Recurring is kept; the default one follows the card's name.
+    await db.recurring.update({ where: { id: linked.id }, data: { amountMinor: feeMinor, currency, nextDate: renewal, frequency: "YEARLY", accountId, paymentMethod: name, ...(oldName && linked.title === `${oldName} annual fee` ? { title } : {}) } });
+    return;
+  }
+  const category = await db.category.findFirst({ where: { userId, parentId: null, name: { in: ["Bills", "Fees"], mode: "insensitive" } }, select: { id: true } });
+  await db.recurring.create({ data: { userId, type: "EXPENSE", title, amountMinor: feeMinor, currency, frequency: "YEARLY", nextDate: renewal, accountId, paymentMethod: name, categoryId: category?.id ?? null, feeAccountId: accountId, tags: ["annual-fee"] } });
 }
 
 export async function setAccountArchived(id: string, archived: boolean) {
@@ -316,50 +351,68 @@ const recurringSchema = z.object({
   group: z.object({ groupId: z.string(), payers: z.record(z.string(), z.number().int().min(0)), split: splitSchema }).nullish(),
 });
 
-/** Adds a recurring bill with the same details as a regular entry: type, account, tags, or a group with payers and split. */
-export async function addRecurring(raw: unknown): Promise<SaveResult> {
-  const u = await requireUser();
+/** Checks a recurring bill's details and turns them into the stored columns. Shared by add and edit. */
+async function buildRecurring(u: { id: string }, raw: unknown) {
   const parsed = recurringSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: "Check the details and try again" };
+  if (!parsed.success) return { error: "Check the details and try again" };
   const d = parsed.data;
   const currency = d.currency.toUpperCase();
-  if (!(CURRENCIES as readonly string[]).includes(currency)) return { ok: false, error: "Unknown currency" };
+  if (!(CURRENCIES as readonly string[]).includes(currency)) return { error: "Unknown currency" };
   const amountMinor = parseToMinor(d.amount, currency);
-  if (!amountMinor) return { ok: false, error: `Enter the amount as a number in ${currency}` };
+  if (!amountMinor) return { error: `Enter the amount as a number in ${currency}` };
   const nextDate = new Date(`${d.nextDate}T00:00:00.000Z`);
-  if (Number.isNaN(+nextDate)) return { ok: false, error: "Pick the next date" };
+  if (Number.isNaN(+nextDate)) return { error: "Pick the next date" };
   const categoryId = d.type === "TRANSFER" || d.type === "INVEST" ? null : d.categoryId || null;
   const accountId = d.accountId || null;
   const toAccountId = d.type === "TRANSFER" ? d.toAccountId || null : null;
-  if (categoryId && !(await db.category.count({ where: { id: categoryId, userId: u.id } }))) return { ok: false, error: "Category not found" };
+  if (categoryId && !(await db.category.count({ where: { id: categoryId, userId: u.id } }))) return { error: "Category not found" };
   const accountIds = [accountId, toAccountId].filter(Boolean) as string[];
-  if (accountIds.length && (await db.account.count({ where: { id: { in: accountIds }, userId: u.id } })) !== accountIds.length) return { ok: false, error: "Account not found" };
-  if (d.type === "TRANSFER" && (!accountId || !toAccountId || accountId === toAccountId)) return { ok: false, error: "Pick two different accounts for a transfer" };
+  if (accountIds.length && (await db.account.count({ where: { id: { in: accountIds }, userId: u.id } })) !== accountIds.length) return { error: "Account not found" };
+  if (d.type === "TRANSFER" && (!accountId || !toAccountId || accountId === toAccountId)) return { error: "Pick two different accounts for a transfer" };
 
   let groupId: string | null = null;
   let groupData: { payers: Record<string, number>; split: unknown } | undefined;
   if (d.group) {
-    if (d.type !== "EXPENSE") return { ok: false, error: "Only expenses can be added to a group" };
+    if (d.type !== "EXPENSE") return { error: "Only expenses can be added to a group" };
     await requireMember(d.group.groupId, u.id);
     const valid = new Set((await db.member.findMany({ where: { groupId: d.group.groupId, left: false }, select: { id: true } })).map((m) => m.id));
     const payers = Object.fromEntries(Object.entries(d.group.payers).filter(([, v]) => v > 0));
     try {
       validatePayers(amountMinor, payers, currency);
       const owed = computeShares(amountMinor, d.group.split as SplitInput, Object.keys(payers), currency);
-      for (const id of [...Object.keys(payers), ...Object.keys(owed)]) if (!valid.has(id)) return { ok: false, error: "Someone in this split is no longer in the group" };
+      for (const id of [...Object.keys(payers), ...Object.keys(owed)]) if (!valid.has(id)) return { error: "Someone in this split is no longer in the group" };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "The split does not add up" };
+      return { error: e instanceof Error ? e.message : "The split does not add up" };
     }
     groupId = d.group.groupId;
     groupData = { payers, split: d.group.split };
   }
-  await db.recurring.create({
+  return {
     data: {
-      userId: u.id, type: d.type, title: d.title, amountMinor, currency, frequency: d.frequency, nextDate,
+      type: d.type, title: d.title, amountMinor, currency, frequency: d.frequency, nextDate,
       categoryId, accountId, toAccountId, merchant: d.merchant || null, note: d.note || null, paymentMethod: d.paymentMethod || null,
-      tags: d.tags, platform: d.type === "INVEST" ? d.platform || null : null, groupId, groupData: groupData as Prisma.InputJsonValue | undefined,
+      tags: d.tags, platform: d.type === "INVEST" ? d.platform || null : null, groupId, groupData: (groupData ?? Prisma.DbNull) as Prisma.InputJsonValue,
     },
-  });
+  };
+}
+
+/** Adds a recurring bill with the same details as a regular entry: type, account, tags, or a group with payers and split. */
+export async function addRecurring(raw: unknown): Promise<SaveResult> {
+  const u = await requireUser();
+  const r = await buildRecurring(u, raw);
+  if (!r.data) return { ok: false, error: r.error! };
+  await db.recurring.create({ data: { userId: u.id, ...r.data } });
+  revalidatePath("/recurring");
+  return { ok: true };
+}
+
+/** Edits a recurring bill you added earlier; only the bill changes, entries already posted from it stay as they are. */
+export async function updateRecurring(id: string, raw: unknown): Promise<SaveResult> {
+  const u = await requireUser();
+  if (!(await db.recurring.count({ where: { id, userId: u.id } }))) return { ok: false, error: "Recurring bill not found" };
+  const r = await buildRecurring(u, raw);
+  if (!r.data) return { ok: false, error: r.error! };
+  await db.recurring.updateMany({ where: { id, userId: u.id }, data: r.data });
   revalidatePath("/recurring");
   return { ok: true };
 }

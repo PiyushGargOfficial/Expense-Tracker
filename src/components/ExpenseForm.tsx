@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { CURRENCIES, minorToInput, parseToMinor } from "@/lib/money";
 import { computeShares, SplitError, type SplitInput } from "@/lib/split";
-import { addRecurring, editExpense } from "@/app/actions";
+import { addRecurring, editExpense, updateRecurring } from "@/app/actions";
 import { CadAmountHint } from "@/components/CadHint";
 
 type M = { id: string; name: string };
@@ -30,7 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "ITEMIZED", label: "By item" },
 ];
 
-export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [], recurring = false }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[]; recurring?: boolean }) {
+export default function ExpenseForm({ groupId, members, meId, defaultCurrency, initial, categories = [], accounts = [], recurring = false, recurringId, initialFrequency }: { groupId: string; members: M[]; meId: string; defaultCurrency: string; initial?: Initial; categories?: M[]; accounts?: M[]; recurring?: boolean; recurringId?: string; initialFrequency?: string }) {
   const router = useRouter();
   const all = members.map((m) => m.id);
   const init = initial?.split;
@@ -55,7 +55,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
 
   const [categoryId, setCategoryId] = useState(() => categories.find((c) => c.name.toLowerCase() === (initial?.category ?? "").toLowerCase())?.id ?? "");
   const [accountId, setAccountId] = useState(initial?.accountId ?? "");
-  const [frequency, setFrequency] = useState("MONTHLY");
+  const [frequency, setFrequency] = useState(initialFrequency ?? "MONTHLY");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const total = parseToMinor(amount, cur);
@@ -102,12 +102,14 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
     try {
       if (recurring) {
         // A recurring group bill: saved with its payers and split, and added as a group expense each time it is due.
-        const r = await addRecurring({
+        const bill = {
           type: "EXPENSE", title: data.title, amount: minorToInput(total!, cur), currency: cur, frequency, nextDate: date,
           categoryId: categoryId || null, accountId: accountId || null, paymentMethod: data.personal.paymentMethod,
           group: { groupId, payers: built.payers, split: built.split },
-        });
+        };
+        const r = recurringId ? await updateRecurring(recurringId, bill) : await addRecurring(bill);
         if (!r.ok) { setError(r.error); return; }
+        if (recurringId) { router.push("/recurring"); router.refresh(); return; }
         setTitle(""); setAmount("");
         router.refresh();
       } else if (initial) {
@@ -226,7 +228,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
       )}
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <button className="btn w-full" disabled={busy}>{recurring ? "Add recurring bill" : initial ? "Save changes" : "Add expense"}</button>
+      <button className="btn w-full" disabled={busy}>{recurring ? (recurringId ? "Save changes" : "Add recurring bill") : initial ? "Save changes" : "Add expense"}</button>
     </form>
   );
 }

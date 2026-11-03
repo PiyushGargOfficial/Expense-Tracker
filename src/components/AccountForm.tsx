@@ -8,6 +8,8 @@ import CadHint from "@/components/CadHint";
 export type AccountValues = {
   id: string; name: string; kind: string; currency: string; institution: string | null; last4: string | null;
   balance: number; creditLimitMinor: number | null; statementDay: number | null; dueDay: number | null; aprBps: number | null; minPaymentMinor: number | null;
+  /** Credit cards: the yearly fee and the date it renews, kept as a yearly bill in Recurring. */
+  annualFeeMinor?: number | null; feeRenewal?: string | null;
   /** Credit cards: the owed amount calculated from the recorded transactions. Editing can't go below it. */
   minOwedMinor?: number;
 };
@@ -97,6 +99,15 @@ export default function AccountForm({ account, defaultCurrency, onDone }: { acco
             <label className="label" htmlFor={`apr-${id}`}>Interest rate (% per year)</label>
             <input id={`apr-${id}`} name="apr" inputMode="decimal" className="input" defaultValue={account?.aprBps != null ? (account.aprBps / 100).toFixed(2) : ""} placeholder="19.99" onChange={clear} />
           </div>
+          <div>
+            <label className="label" htmlFor={`fee-${id}`}>Annual fee ({cur})</label>
+            <input id={`fee-${id}`} name="annualFee" inputMode="decimal" className="input" defaultValue={account?.annualFeeMinor ? minorToInput(account.annualFeeMinor, cur) : ""} placeholder="120.00" onChange={clear} />
+          </div>
+          <div>
+            <label className="label" htmlFor={`renew-${id}`}>Fee renews on</label>
+            <input id={`renew-${id}`} name="feeRenewal" type="date" className="input" defaultValue={account?.feeRenewal ?? ""} onChange={clear} />
+          </div>
+          <p className="col-span-2 -mt-1 text-xs text-muted">The annual fee is added to Recurring as a yearly bill paid with this card. Clear the fee to remove it.</p>
         </>
       )}
 

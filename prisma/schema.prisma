@@ -172,8 +172,11 @@ model Recurring {
   // Group bill: added as a group expense with these payers and split ({ payers, split }, member ids and minor units).
   groupId       String?
   groupData     Json?
+  // Set when this is a credit card's annual fee, kept in step with the card's annual fee fields (see saveAccount).
+  feeAccountId  String?
 
   @@index([userId, nextDate])
+  @@index([feeAccountId])
 }
 
 enum Frequency {

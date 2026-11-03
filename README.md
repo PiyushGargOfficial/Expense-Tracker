@@ -89,3 +89,6 @@ show the equivalent and the current rate as you type. Rates come from open.er-ap
 approximations if the service is down) and are for display only: nothing is converted or added across currencies.
 
 Layouts are checked at iPhone 17 Pro size (402 x 874): pages never scroll sideways, stats stack, and the bottom tab bar fits all eight sections.
+
+- Recurring bills can be edited (Edit on the Recurring tab). A credit card's annual fee and renewal date (Accounts, Edit) are kept as a yearly bill in Recurring, so changing either place updates the other; clearing the fee removes the bill.
+- Recent on Home lists the most recently added entries first.
