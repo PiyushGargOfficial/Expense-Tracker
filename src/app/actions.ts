@@ -544,7 +544,9 @@ export async function removeExpense(groupId: string, expenseId: string) {
   const u = await requireUser();
   const m = await requireMember(groupId, u.id);
   await deleteGroupExpense({ id: u.id, name: u.name }, m.role === "ADMIN", groupId, expenseId);
-  revalidatePath(`/groups/${groupId}`);
+  for (const p of ["/", "/transactions", "/budgets", "/reports", "/accounts"]) revalidatePath(p);
+  // The expense page no longer exists, so go back to the group instead of landing on a 404.
+  redirect(`/groups/${groupId}`);
 }
 
 export async function undoSettlement(groupId: string, settlementId: string) {
