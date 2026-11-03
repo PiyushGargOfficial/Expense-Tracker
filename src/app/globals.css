@@ -43,6 +43,9 @@ body {
  */
 @layer base {
   html { @apply min-[1920px]:text-[18px] min-[2400px]:text-[20px]; }
+  /* Tailwind v4 leaves buttons on the arrow cursor; show the hand on anything clickable, and a "no" cursor when disabled. */
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [role="tab"], summary, select:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled), input[type="date"]:not(:disabled), label[for] { cursor: pointer; }
+  button:disabled, select:disabled { cursor: not-allowed; }
 }
 
 @layer components {
