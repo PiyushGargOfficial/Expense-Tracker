@@ -89,6 +89,24 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
   let preview: Record<string, number> | null = null;
   try { if (total) { const b = build(); preview = computeShares(total, b.split, Object.keys(b.payers)); } } catch { preview = null; }
 
+  // What is still to be assigned for the chosen way of splitting, so it is clear how close the split is to adding up.
+  let leftover: { label: string; value: string; ok: boolean } | null = null;
+  if (total) {
+    const fmt = (n: number) => `${minorToInput(Math.abs(n), cur)} ${cur}`;
+    if (tab === "EXACT") {
+      const left = total - all.reduce((a, id) => a + (parseToMinor(exact[id] || "0", cur) ?? 0), 0);
+      leftover = left === 0 ? { label: "Fully assigned", value: fmt(total), ok: true } : { label: left > 0 ? "Left to assign" : "Over by", value: fmt(left), ok: false };
+    } else if (tab === "PERCENT") {
+      const left = Math.round((100 - all.reduce((a, id) => a + num(pct[id]), 0)) * 100) / 100;
+      leftover = left === 0 ? { label: "Fully assigned", value: "100%", ok: true } : { label: left > 0 ? "Left to assign" : "Over by", value: `${Math.abs(left)}%`, ok: false };
+    } else if (tab === "ITEMIZED") {
+      const left = total - items.reduce((a, it) => a + (parseToMinor(it.amount || "0", cur) ?? 0), 0);
+      leftover = left === 0 ? { label: "Items add up to the total", value: fmt(total), ok: true } : left > 0
+        ? { label: "Not on an item (tax, tip: shared by what each person ordered)", value: fmt(left), ok: true }
+        : { label: "Items are over the total by", value: fmt(left), ok: false };
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -221,12 +239,21 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
         )}
       </fieldset>
 
-      {preview && (
+      {(preview || leftover) && (
         <div className="card text-sm" aria-label="Preview">
-          <div className="mb-1 text-muted">Each person owes</div>
-          {Object.entries(preview).filter(([, v]) => v > 0).map(([id, v]) => (
-            <div key={id} className="flex justify-between"><span>{id === meId ? "You" : name(id)}</span><span>{minorToInput(v, cur)} {cur}</span></div>
-          ))}
+          {leftover && (
+            <div className={`mb-2 flex justify-between font-medium ${leftover.ok ? "text-emerald-600" : "text-amber-600"}`}>
+              <span>{leftover.label}</span><span>{leftover.value}</span>
+            </div>
+          )}
+          {preview && (
+            <>
+              <div className="mb-1 text-muted">Each person owes</div>
+              {Object.entries(preview).filter(([, v]) => v > 0).map(([id, v]) => (
+                <div key={id} className="flex justify-between"><span>{id === meId ? "You" : name(id)}</span><span>{minorToInput(v, cur)} {cur}</span></div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
