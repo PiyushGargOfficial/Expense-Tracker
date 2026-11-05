@@ -4,17 +4,23 @@ import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { parseToMinor, CURRENCIES } from "@/lib/money";
 import { CadAmountHint } from "@/components/CadHint";
+import { ASSET_TYPES, PLATFORM_SUGGESTIONS } from "@/lib/investments";
 
 type Opt = { id: string; name: string };
 export type GroupOpt = { id: string; name: string; meId: string; memberIds: string[]; currency: string };
 
-export type HoldingOpt = { name: string; platform: string; currency: string };
+export type HoldingOpt = { name: string; platform: string; currency: string; assetType?: string; goalId?: string | null };
+export type GoalOpt = { id: string; name: string; currency: string };
 
-export default function QuickAdd({ categories, accounts, currency, groups, holdings = [] }: { categories: Opt[]; accounts: (Opt & { currency: string })[]; currency: string; groups: GroupOpt[]; holdings?: HoldingOpt[] }) {
+export default function QuickAdd({ categories, accounts, currency, groups, holdings = [], goals = [] }: { categories: Opt[]; accounts: (Opt & { currency: string })[]; currency: string; groups: GroupOpt[]; holdings?: HoldingOpt[]; goals?: GoalOpt[] }) {
   const router = useRouter();
   const amountRef = useRef<HTMLInputElement>(null);
   const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "INVEST">("EXPENSE");
   const [platform, setPlatform] = useState("");
+  const [assetType, setAssetType] = useState("");
+  const [goalId, setGoalId] = useState("");
+  const [value, setValue] = useState("");
+  const [holdingNote, setHoldingNote] = useState("");
   const [cur, setCur] = useState(currency);
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -36,6 +42,8 @@ export default function QuickAdd({ categories, accounts, currency, groups, holdi
     const amountMinor = parseToMinor(amount, cur);
     if (!amountMinor) return setMsg({ text: `Enter a valid amount in ${cur}`, bad: true });
     if (invest && !note.trim()) return setMsg({ text: "Enter the investment name in the note", bad: true });
+    const valueMinor = invest && value.trim() ? parseToMinor(value, cur) : undefined;
+    if (invest && value.trim() && valueMinor == null) return setMsg({ text: `Current value must be a number in ${cur}`, bad: true });
     setBusy(true);
     // With a group selected this becomes a group expense (paid by you); your share also lands in your personal
     // totals automatically, so nothing is entered twice.
@@ -61,6 +69,10 @@ export default function QuickAdd({ categories, accounts, currency, groups, holdi
         type, amountMinor, currency: cur, date, note: note || undefined,
         categoryId: type === "TRANSFER" || invest ? null : categoryId || null,
         platform: invest && !knownHolding ? platform.trim() || undefined : undefined,
+        assetType: invest ? assetType || (knownHolding ? undefined : "TFSA") : undefined,
+        goalId: invest ? goalId || undefined : undefined,
+        valueMinor: invest ? valueMinor : undefined,
+        holdingNote: invest ? holdingNote.trim() || undefined : undefined,
         accountId: accountId || null,
         toAccountId: type === "TRANSFER" ? toAccountId || null : null,
       },
@@ -68,7 +80,7 @@ export default function QuickAdd({ categories, accounts, currency, groups, holdi
     setBusy(false);
     if (r.status === "error") return setMsg({ text: r.error, bad: true });
     setMsg({ text: r.status === "queued" ? "Saved offline. Will sync when you're back online." : "Added" });
-    setAmount(""); setNote(""); setPlatform("");
+    setAmount(""); setNote(""); setPlatform(""); setAssetType(""); setGoalId(""); setValue(""); setHoldingNote("");
     amountRef.current?.focus();
     if (r.status === "synced") router.refresh();
   }
@@ -120,14 +132,29 @@ export default function QuickAdd({ categories, accounts, currency, groups, holdi
       {invest && (
         <>
           <datalist id="holding-names">{[...new Set(holdings.filter((h) => h.currency === cur).map((h) => h.name))].map((n) => <option key={n} value={n} />)}</datalist>
-          {knownHolding ? (
-            <p className="text-xs text-muted">Adds to your existing {knownHolding.name} on {knownHolding.platform}. It is not counted as spending.</p>
-          ) : (
-            <>
-              <input placeholder="Platform for this new investment, e.g. Questrade" aria-label="Platform" className="input" value={platform} onChange={(e) => setPlatform(e.target.value)} />
-              <p className="text-xs text-muted">A new investment is created with this name. It is not counted as spending.</p>
-            </>
-          )}
+          <div className="grid grid-cols-2 gap-2">
+            {knownHolding ? (
+              <input aria-label="Platform" className="input" value={knownHolding.platform} disabled readOnly />
+            ) : (
+              <>
+                <input placeholder="Platform, e.g. Wealthsimple" aria-label="Platform" list="holding-platforms" className="input" value={platform} onChange={(e) => setPlatform(e.target.value)} />
+                <datalist id="holding-platforms">{[...new Set([...holdings.map((h) => h.platform), ...PLATFORM_SUGGESTIONS])].map((p) => <option key={p} value={p} />)}</datalist>
+              </>
+            )}
+            <select aria-label="Type" className="input" value={assetType || knownHolding?.assetType || "TFSA"} onChange={(e) => setAssetType(e.target.value)}>
+              {ASSET_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+            </select>
+            <select aria-label="Goal" className="input" value={goalId || knownHolding?.goalId || ""} onChange={(e) => setGoalId(e.target.value)}>
+              <option value="">No goal</option>
+              {goals.filter((g) => g.currency === cur).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+            <input inputMode="decimal" placeholder="Current value (optional)" aria-label="Current value" className="input" value={value} onChange={(e) => setValue(e.target.value)} />
+          </div>
+          <input placeholder="Note about this investment (optional)" aria-label="Investment note" className="input" maxLength={300} value={holdingNote} onChange={(e) => setHoldingNote(e.target.value)} />
+          <p className="text-xs text-muted">
+            {knownHolding ? `Adds to your existing ${knownHolding.name} on ${knownHolding.platform}.` : "A new investment is created with this name."}{" "}
+            The amount is added to Invested and to Current value (or enter the new total value above), and comes off the account it is paid from. It is not counted as spending.
+          </p>
         </>
       )}
 

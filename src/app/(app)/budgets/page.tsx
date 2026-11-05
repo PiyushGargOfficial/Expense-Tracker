@@ -6,15 +6,28 @@ import Link from "next/link";
 import { deleteBudget, setBudget } from "@/app/actions";
 import BudgetEdit from "@/components/BudgetEdit";
 import CadHint from "@/components/CadHint";
+import { totalsByCurrency } from "@/lib/investments";
+import { deltaFor } from "@/lib/accounts";
 
 export default async function Budgets() {
   const user = await requireUser();
   const { start, end } = monthRange();
-  const [budgets, categories, spent] = await Promise.all([
+  const [budgets, categories, spent, investedNow, holdings, chequing, acctTxns] = await Promise.all([
     db.budget.findMany({ where: { userId: user.id }, include: { category: true } }),
     db.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
     db.transaction.groupBy({ by: ["categoryId", "currency"], where: { userId: user.id, deletedAt: null, type: "EXPENSE", date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
+    db.transaction.groupBy({ by: ["currency"], where: { userId: user.id, deletedAt: null, type: "INVEST", date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
+    db.investment.findMany({ where: { userId: user.id }, select: { platform: true, currency: true, investedMinor: true, valueMinor: true } }),
+    db.account.findMany({ where: { userId: user.id, kind: "BANK", archived: false } }),
+    db.transaction.findMany({
+      where: { userId: user.id, deletedAt: null, OR: [{ accountId: { not: null } }, { toAccountId: { not: null } }] },
+      select: { type: true, amountMinor: true, currency: true, date: true, accountId: true, toAccountId: true },
+    }),
   ]);
+  // Investing is not spending, so it never uses up a budget; it is shown here with the balance it came out of.
+  const portfolio = totalsByCurrency(holdings);
+  const cash: Record<string, number> = {};
+  for (const a of chequing) cash[a.currency] = (cash[a.currency] ?? 0) + a.openingMinor + deltaFor(a.id, a.currency, acctTxns).delta;
   // Lent out: money you paid on behalf of others that they haven't paid back yet, across all your groups.
   const memberships = await db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { members: true } } } });
   const lent: { groupId: string; group: string; owes: { name: string; amountMinor: number; currency: string }[] }[] = [];
@@ -75,6 +88,23 @@ export default async function Budgets() {
           );
         })}
       </ul>
+
+      <section className="card space-y-2" aria-label="Investments">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-semibold">Investments</h2>
+          <Link href="/investments" className="-m-2 p-2 text-xs underline">Investments</Link>
+        </div>
+        <p className="text-xs text-muted">Money you invest comes off your chequing balance but is not counted as spending or against any budget.</p>
+        {[...new Set([...investedNow.map((r) => r.currency), ...Object.keys(portfolio), ...Object.keys(cash)])].map((cur) => (
+          <dl key={cur} className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <dt className="text-muted">Invested this month ({cur})</dt><dd className="text-right font-semibold text-sky-600">{formatMinor(investedNow.find((r) => r.currency === cur)?._sum.amountMinor ?? 0, cur)}</dd>
+            <dt className="text-muted">Total invested ({cur})</dt><dd className="text-right font-semibold">{formatMinor(portfolio[cur]?.investedMinor ?? 0, cur)}</dd>
+            <dt className="text-muted">Portfolio value ({cur})</dt><dd className="text-right font-semibold">{formatMinor(portfolio[cur]?.valueMinor ?? 0, cur)}</dd>
+            {cur in cash && <><dt className="text-muted">Chequing balance ({cur})</dt><dd className={`text-right font-semibold ${cash[cur] < 0 ? "text-red-600" : ""}`}>{formatMinor(cash[cur], cur)}</dd></>}
+          </dl>
+        ))}
+        {investedNow.length === 0 && Object.keys(portfolio).length === 0 && <p className="text-sm text-muted">Nothing invested yet.</p>}
+      </section>
 
       <section className="card space-y-2" aria-label="Lent out">
         <h2 className="font-semibold">Lent out</h2>

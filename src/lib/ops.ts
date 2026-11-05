@@ -7,6 +7,7 @@ import { computeShares, validatePayers, type SplitInput } from "@/lib/split";
 import { syncMirrors } from "@/lib/mirror";
 import { autoCategoryId } from "@/lib/autoCategory";
 import { PAYMENT_VALUES, paymentLabel } from "@/lib/payment";
+import { ASSET_VALUES } from "@/lib/investments";
 
 const minor = z.number().int().positive().max(1_000_000_000_00);
 const currency = z.string().length(3).transform((s) => s.toUpperCase());
@@ -31,6 +32,11 @@ export const txnSchema = z.object({
   receiptUrl: z.string().max(500_000).nullish(),
   // INVEST only: the platform to file a brand-new investment under (ignored when the name already exists).
   platform: z.string().max(60).optional(),
+  // INVEST only, same as the Add investment form: type, goal, what the whole holding is worth now, and a note on it.
+  assetType: z.string().max(20).optional(),
+  goalId: z.string().nullish(),
+  valueMinor: z.number().int().min(0).max(1_000_000_000_00).nullish(),
+  holdingNote: z.string().max(300).optional(),
 });
 
 export async function createTxn(userId: string, clientId: string, raw: unknown) {
@@ -43,18 +49,26 @@ export async function createTxn(userId: string, clientId: string, raw: unknown) 
 
   const existing = await db.transaction.findUnique({ where: { userId_clientId: { userId, clientId } } });
   if (existing) return existing; // already applied
-  const { platform, ...data } = d;
+  const { platform, assetType, goalId, valueMinor, holdingNote, ...data } = d;
   // Saved without a category: pick one from what the user chose for the same merchant or note before, else a built-in word list.
   if (d.type !== "INVEST") return db.transaction.create({ data: { ...data, categoryId: d.categoryId || (await autoCategoryId(db, userId, d)), tags: d.tags, userId, clientId } });
 
   // An investment is matched by name (the note) and currency: it adds to that holding, or creates it.
   const name = (d.note ?? "").trim().replace(/\s+/g, " ");
   if (!name) throw new Error("Enter the investment name in the note");
+  if (assetType && !ASSET_VALUES.includes(assetType)) throw new Error("Pick a type");
+  if (goalId) {
+    const goal = await db.investmentGoal.findFirst({ where: { id: goalId, userId } });
+    if (!goal) throw new Error("Goal not found");
+    if (goal.currency !== d.currency) throw new Error(`That goal is in ${goal.currency}; this investment is in ${d.currency}`);
+  }
   return db.$transaction(async (tx) => {
     const holding = await tx.investment.findFirst({ where: { userId, currency: d.currency, name: { equals: name, mode: "insensitive" } } });
+    // Only what was filled in changes an existing holding; a given current value replaces the old one (it is what the whole holding is worth now).
+    const extras = { ...(assetType ? { assetType } : {}), ...(goalId ? { goalId } : {}), ...(holdingNote?.trim() ? { note: holdingNote.trim() } : {}) };
     const inv = holding
-      ? await tx.investment.update({ where: { id: holding.id }, data: { investedMinor: { increment: d.amountMinor }, valueMinor: { increment: d.amountMinor } } })
-      : await tx.investment.create({ data: { userId, name, platform: platform?.trim() || "Other", currency: d.currency, investedMinor: d.amountMinor, valueMinor: d.amountMinor } });
+      ? await tx.investment.update({ where: { id: holding.id }, data: { ...extras, investedMinor: { increment: d.amountMinor }, valueMinor: valueMinor != null ? valueMinor : { increment: d.amountMinor } } })
+      : await tx.investment.create({ data: { ...extras, userId, name, platform: platform?.trim() || "Other", currency: d.currency, investedMinor: d.amountMinor, valueMinor: valueMinor ?? d.amountMinor } });
     return tx.transaction.create({ data: { ...data, note: inv.name, categoryId: null, toAccountId: null, tags: d.tags, userId, clientId, investmentId: inv.id } });
   });
 }

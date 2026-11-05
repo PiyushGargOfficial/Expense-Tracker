@@ -10,7 +10,7 @@ import { deleteTxn } from "@/app/actions";
 export default async function Home() {
   const user = await requireUser();
   const { start, end } = monthRange();
-  const [categories, accounts, recent, month, memberships, holdings] = await Promise.all([
+  const [categories, accounts, recent, month, memberships, holdings, goals] = await Promise.all([
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
     db.account.findMany({ where: { userId: user.id, archived: false } }),
     db.transaction.findMany({
@@ -19,7 +19,8 @@ export default async function Home() {
     }),
     db.transaction.groupBy({ by: ["type", "currency"], where: { userId: user.id, deletedAt: null, date: { gte: start, lt: end } }, _sum: { amountMinor: true } }),
     db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { members: { where: { left: false }, select: { id: true } } } } } }),
-    db.investment.findMany({ where: { userId: user.id }, select: { name: true, platform: true, currency: true, investedMinor: true, valueMinor: true } }),
+    db.investment.findMany({ where: { userId: user.id }, select: { name: true, platform: true, currency: true, investedMinor: true, valueMinor: true, assetType: true, goalId: true } }),
+    db.investmentGoal.findMany({ where: { userId: user.id }, select: { id: true, name: true, currency: true }, orderBy: { name: "asc" } }),
   ]);
   const worth = totalsByCurrency(holdings);
   const groupOpts = memberships.map((m) => ({ id: m.groupId, name: m.group.name, meId: m.id, memberIds: m.group.members.map((x) => x.id), currency: m.group.defaultCurrency }));
@@ -41,7 +42,7 @@ export default async function Home() {
     // One column on phones; on laptops and larger, entry + totals on the left, balances + history on the right.
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start">
      <div className="space-y-5 lg:sticky lg:top-8">
-      <QuickAdd categories={categories} accounts={accounts} currency={user.defaultCurrency} groups={groupOpts} holdings={holdings} />
+      <QuickAdd categories={categories} accounts={accounts} currency={user.defaultCurrency} groups={groupOpts} holdings={holdings} goals={goals} />
 
       <section className="grid grid-cols-2 gap-3" aria-label="This month">
         <div className="card">

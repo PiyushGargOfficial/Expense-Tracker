@@ -26,8 +26,10 @@ interest rate, and what was paid since the last statement. The amount owed is ca
 **Investments**: holdings on each platform (Wealthsimple, Questrade, crypto, GICs…) with amount invested, current value
 and gain or loss, totals per platform and currency, and goals with progress, amount to go and the monthly amount needed
 by the target date (based on the amount invested, not gains). A Net deposits box totals the balances of your chequing accounts. Private to you. Values are entered by hand. The **Invest** tab on Home records money put into an investment: it is matched to a holding by name
-(or creates one), is shown as Invested rather than spent, and is kept out of budgets and reports. Deleting it takes it
-off the holding again.
+(or creates one), is shown as Invested rather than spent, and is kept out of budgets and reports. It has the same fields as
+Add investment (platform, type, goal, current value, note); a current value you give replaces the holding's value, otherwise
+the amount is added to it. It comes off the account it is paid from, and the Budgets page has an Investments card with
+invested this month, totals, portfolio value and the chequing balance. Deleting it takes it off the holding again.
 
 **Groups**: create groups, invite link, name-only members (claimable on join), equal / exact / percent / shares /
 itemized splits, single or multiple payers, per-group balances, simplified "who owes whom", partial settle-up
