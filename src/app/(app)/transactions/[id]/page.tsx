@@ -10,6 +10,13 @@ export default async function EditTransaction({ params }: { params: Promise<{ id
   if (!t) notFound();
   // A share of a group expense is edited from the group, where everyone's split stays in step.
   if (t.groupExpense) redirect(`/groups/${t.groupExpense.groupId}/expenses/${t.groupExpenseId}`);
+  const [holding, goals, platformRows] = t.type === "INVEST"
+    ? await Promise.all([
+        t.investmentId ? db.investment.findFirst({ where: { id: t.investmentId, userId: user.id } }) : null,
+        db.investmentGoal.findMany({ where: { userId: user.id }, orderBy: { name: "asc" }, select: { id: true, name: true, currency: true } }),
+        db.investment.findMany({ where: { userId: user.id }, distinct: ["platform"], select: { platform: true } }),
+      ])
+    : [null, [], []];
   const [categories, accounts] = await Promise.all([
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.account.findMany({ where: { userId: user.id, OR: [{ archived: false }, { id: { in: [t.accountId, t.toAccountId].filter(Boolean) as string[] } }] }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -24,6 +31,9 @@ export default async function EditTransaction({ params }: { params: Promise<{ id
         }}
         categories={categories}
         accounts={accounts}
+        holding={holding ? { platform: holding.platform, assetType: holding.assetType, goalId: holding.goalId ?? "", valueMinor: holding.valueMinor, note: holding.note ?? "" } : undefined}
+        platforms={platformRows.map((p) => p.platform)}
+        goals={goals}
       />
     </div>
   );

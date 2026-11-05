@@ -73,7 +73,7 @@ export async function createTxn(userId: string, clientId: string, raw: unknown) 
   });
 }
 
-export const txnEditSchema = txnSchema.omit({ type: true, platform: true, receiptUrl: true }).extend({ type: z.enum(["EXPENSE", "INCOME"]).optional() });
+export const txnEditSchema = txnSchema.omit({ type: true, receiptUrl: true }).extend({ type: z.enum(["EXPENSE", "INCOME"]).optional() });
 
 /**
  * Edits one of the user's own entries (not the mirror of a group expense, which is edited from the group).
@@ -94,11 +94,30 @@ export async function updateTxn(userId: string, id: string, raw: unknown) {
     paymentMethod: t.type === "TRANSFER" ? null : d.accountId ? account?.name ?? t.paymentMethod : null,
   };
   if (t.type === "INVEST") {
+    if (d.assetType && !ASSET_VALUES.includes(d.assetType)) throw new Error("Pick a type");
+    if (d.goalId) {
+      const goal = await db.investmentGoal.findFirst({ where: { id: d.goalId, userId } });
+      if (!goal) throw new Error("Goal not found");
+      if (goal.currency !== t.currency) throw new Error(`That goal is in ${goal.currency}; this investment is in ${t.currency}`);
+    }
     await db.$transaction(async (tx) => {
       await tx.transaction.update({ where: { id }, data: { ...common, categoryId: null, toAccountId: null } });
       const h = t.investmentId ? await tx.investment.findUnique({ where: { id: t.investmentId } }) : null;
+      if (!h) return;
       const delta = d.amountMinor - t.amountMinor;
-      if (h && delta) await tx.investment.update({ where: { id: h.id }, data: { investedMinor: Math.max(0, h.investedMinor + delta), valueMinor: Math.max(0, h.valueMinor + delta) } });
+      // The holding's own details are the same ones as on Add investment. A current value that was typed replaces the old one;
+      // otherwise the value moves by the change in amount. A goal of "" clears it, and leaving a field out keeps it.
+      await tx.investment.update({
+        where: { id: h.id },
+        data: {
+          investedMinor: Math.max(0, h.investedMinor + delta),
+          valueMinor: d.valueMinor != null ? d.valueMinor : Math.max(0, h.valueMinor + delta),
+          ...(d.platform?.trim() ? { platform: d.platform.trim().replace(/\s+/g, " ") } : {}),
+          ...(d.assetType ? { assetType: d.assetType } : {}),
+          ...(d.goalId !== undefined ? { goalId: d.goalId || null } : {}),
+          ...(d.holdingNote !== undefined ? { note: d.holdingNote.trim() || null } : {}),
+        },
+      });
     });
     return;
   }
