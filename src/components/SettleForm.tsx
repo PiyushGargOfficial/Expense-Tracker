@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { formatPlain, minorToInput, parseToMinor } from "@/lib/money";
 import { PAYMENT_METHODS } from "@/lib/payment";
+import { todayInCanada } from "@/lib/dates";
 
 /**
  * Records a full or partial payment against one suggested debt. Pick Full, Half or type any amount; the form
@@ -14,7 +15,7 @@ export default function SettleForm({ groupId, fromId, toId, fromName, toName, am
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(minorToInput(amountMinor, currency));
   const [method, setMethod] = useState("cash");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayInCanada());
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 

@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { computeNet, simplify } from "@/lib/balances";
+import { todayUtc } from "@/lib/dates";
 
-export function monthRange(d = new Date()) {
+/** The calendar month containing `d` (a stored date, UTC midnight); by default the current month in Canadian time. */
+export function monthRange(d: Date = todayUtc()) {
   return { start: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)), end: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)) };
 }
 

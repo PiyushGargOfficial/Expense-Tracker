@@ -5,6 +5,7 @@ import { newClientId, submitOp } from "@/lib/outbox";
 import { parseToMinor, CURRENCIES } from "@/lib/money";
 import { CadAmountHint } from "@/components/CadHint";
 import { ASSET_TYPES, PLATFORM_SUGGESTIONS } from "@/lib/investments";
+import { todayInCanada } from "@/lib/dates";
 
 type Opt = { id: string; name: string };
 export type GroupOpt = { id: string; name: string; meId: string; memberIds: string[]; currency: string };
@@ -27,7 +28,7 @@ export default function QuickAdd({ categories, accounts, currency, groups, holdi
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [toAccountId, setToAccountId] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayInCanada());
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [groupId, setGroupId] = useState("");

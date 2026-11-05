@@ -21,6 +21,7 @@ import { passwordStatus } from "@/lib/credentials";
 import { syncGroupMirrors } from "@/lib/mirror";
 import { addRecurringToExpenses } from "@/lib/recurring";
 import { autoCategoryId } from "@/lib/autoCategory";
+import { todayUtc } from "@/lib/dates";
 import { TOTP_REQUIRED } from "@/lib/authMessages";
 import { passwordProblem } from "@/lib/password";
 import { ASSET_VALUES } from "@/lib/investments";
@@ -176,7 +177,7 @@ export async function saveAccount(id: string | null, f: FormData): Promise<SaveR
       }
       // No date given: keep the one already saved, or assume it renews a year from today.
       else if (existing) feeRenewal = (await db.recurring.findFirst({ where: { userId: u.id, feeAccountId: existing.id }, select: { nextDate: true } }))?.nextDate ?? null;
-      if (!feeRenewal) { feeRenewal = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`); feeRenewal.setUTCFullYear(feeRenewal.getUTCFullYear() + 1); }
+      if (!feeRenewal) { feeRenewal = todayUtc(); feeRenewal.setUTCFullYear(feeRenewal.getUTCFullYear() + 1); }
     }
   }
 

@@ -6,6 +6,7 @@ import { CURRENCIES, minorToInput, parseToMinor } from "@/lib/money";
 import { computeShares, SplitError, type SplitInput } from "@/lib/split";
 import { addRecurring, editExpense, updateRecurring } from "@/app/actions";
 import { CadAmountHint } from "@/components/CadHint";
+import { todayInCanada } from "@/lib/dates";
 
 type M = { id: string; name: string };
 type Initial = {
@@ -40,7 +41,7 @@ export default function ExpenseForm({ groupId, members, meId, defaultCurrency, i
   const [title, setTitle] = useState(initial?.title ?? "");
   const [amount, setAmount] = useState(initial ? minorToInput(initial.amountMinor, initCur) : "");
   const [cur, setCur] = useState(initCur);
-  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(initial?.date ?? todayInCanada());
   const initPayers = initial ? Object.keys(initial.payers) : [meId];
   const [multiPay, setMultiPay] = useState(initPayers.length > 1);
   const [payerId, setPayerId] = useState(initPayers[0] ?? meId);

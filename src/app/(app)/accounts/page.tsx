@@ -5,13 +5,14 @@ import { creditSummary, deltaFor, kindLabel, type AcctTxn } from "@/lib/accounts
 import { monthRange } from "@/lib/queries";
 import { setAccountArchived } from "@/app/actions";
 import AccountForm, { AccountEdit, type AccountValues } from "@/components/AccountForm";
+import { todayUtc } from "@/lib/dates";
 
 const fmtDate = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 const dueText = (days: number) => (days === 0 ? "due today" : days === 1 ? "due tomorrow" : `in ${days} days`);
 
 export default async function Accounts() {
   const user = await requireUser();
-  const today = new Date();
+  const today = todayUtc();
   const { start, end } = monthRange(today);
   const [accounts, feeBills, txns] = await Promise.all([
     db.account.findMany({ where: { userId: user.id }, orderBy: [{ kind: "asc" }, { name: "asc" }] }),

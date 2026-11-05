@@ -3,13 +3,14 @@ import { requireUser } from "@/lib/session";
 import { decimalsFor, formatMinor } from "@/lib/money";
 import { BudgetBars, CategoryPie, MonthBars } from "@/components/Charts";
 import { monthRange } from "@/lib/queries";
+import { todayUtc } from "@/lib/dates";
 
 export default async function Reports({ searchParams }: { searchParams: Promise<{ cur?: string }> }) {
   const user = await requireUser();
   const { cur } = await searchParams;
   // Reports open in your default currency (CAD) unless another is picked (?cur=INR etc.).
   const currency = cur && /^[A-Za-z]{3}$/.test(cur) ? cur.toUpperCase() : user.defaultCurrency;
-  const since = new Date(); since.setUTCMonth(since.getUTCMonth() - 5, 1); since.setUTCHours(0, 0, 0, 0);
+  const since = todayUtc(); since.setUTCMonth(since.getUTCMonth() - 5, 1); since.setUTCHours(0, 0, 0, 0);
   const txns = await db.transaction.findMany({ where: { userId: user.id, deletedAt: null, type: "EXPENSE", currency, date: { gte: since } }, include: { category: true } });
   const div = 10 ** decimalsFor(currency);
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { newClientId, submitOp } from "@/lib/outbox";
 import { CURRENCIES, parseToMinor } from "@/lib/money";
 import { PAYMENT_METHODS } from "@/lib/payment";
+import { todayInCanada } from "@/lib/dates";
 
 type M = { id: string; name: string };
 
@@ -20,7 +21,7 @@ export default function RecordPaymentForm({ groupId, members, meId, currency }: 
   const [amount, setAmount] = useState("");
   const [cur, setCur] = useState(currency);
   const [method, setMethod] = useState("cash");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayInCanada());
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);

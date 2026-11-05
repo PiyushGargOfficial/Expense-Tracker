@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { createGroupExpense, createTxn } from "@/lib/ops";
+import { todayUtc } from "@/lib/dates";
 
 function advance(d: Date, f: "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY"): Date {
   const n = new Date(d);
@@ -21,7 +22,7 @@ function advance(d: Date, f: "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEAR
 export async function addRecurringToExpenses(userId: string, ids: string[]) {
   const items = await db.recurring.findMany({ where: { userId, active: true, id: { in: ids } } });
   const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true } });
-  const today = new Date();
+  const today = todayUtc(); // the day in Canadian time, so a bill due today counts as due
   let added = 0;
   const failed: string[] = [];
   for (const r of items) {
