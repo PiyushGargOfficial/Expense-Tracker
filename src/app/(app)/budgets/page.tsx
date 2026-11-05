@@ -45,13 +45,15 @@ export default async function Budgets() {
     if (owes.length) lent.push({ groupId: m.groupId, group: m.group.name, owes });
   }
 
-  const used = (b: (typeof budgets)[number]) =>
-    spent.filter((s) => s.currency === b.currency && (b.categoryId === null || s.categoryId === b.categoryId)).reduce((a, s) => a + (s._sum.amountMinor ?? 0), 0);
+  // The investing budget counts what went in through the Invest tab this month; every other budget counts spending.
+  const used = (b: (typeof budgets)[number]) => b.invest
+    ? investedNow.filter((r) => r.currency === b.currency).reduce((a, r) => a + (r._sum.amountMinor ?? 0), 0)
+    : spent.filter((s) => s.currency === b.currency && (b.categoryId === null || s.categoryId === b.categoryId)).reduce((a, s) => a + (s._sum.amountMinor ?? 0), 0);
 
   // Opens All transactions filtered to this budget: its category and currency, this month, largest first.
   const day = (d: Date) => d.toISOString().slice(0, 10);
   const txnsHref = (b: (typeof budgets)[number]) => {
-    const q = new URLSearchParams({ type: "EXPENSE", currency: b.currency, from: day(start), to: day(new Date(+end - 1)), sort: "amount" });
+    const q = new URLSearchParams({ type: b.invest ? "INVEST" : "EXPENSE", currency: b.currency, from: day(start), to: day(new Date(+end - 1)), sort: "amount" });
     if (b.categoryId) q.set("cat", b.categoryId);
     return `/transactions?${q}`;
   };
@@ -64,21 +66,22 @@ export default async function Budgets() {
           const u = used(b);
           // Compare real amounts, not a rounded percentage: spending exactly the budget is "completed", not "over".
           const pct = Math.floor((u / b.limitMinor) * 100); // floor so 99.6% never shows as 100%
-          const over = u > b.limitMinor;
+          const over = u > b.limitMinor && !b.invest; // putting more into investments than planned is not a warning
           const completed = u === b.limitMinor;
-          const warn = u * 100 >= b.alertAtPct * b.limitMinor;
+          const warn = !b.invest && u * 100 >= b.alertAtPct * b.limitMinor;
           return (
             <li key={b.id} className="card">
               <div className="flex flex-wrap items-center justify-between gap-y-1">
-                <Link href={txnsHref(b)} className="font-medium underline-offset-2 hover:underline">{b.category?.name ?? "Overall"} <span aria-hidden className="text-muted">›</span></Link>
+                <Link href={txnsHref(b)} className="font-medium underline-offset-2 hover:underline">{b.invest ? "Investments" : b.category?.name ?? "Overall"} <span aria-hidden className="text-muted">›</span></Link>
                 <BudgetEdit id={b.id} currency={b.currency} limitMinor={b.limitMinor} alertAtPct={b.alertAtPct}>
                   <form action={deleteBudget.bind(null, b.id)}><button className="-m-2 p-2 underline">Remove</button></form>
                 </BudgetEdit>
               </div>
               <div className="my-2 h-2 overflow-hidden rounded bg-black/10 dark:bg-white/10" role="progressbar" aria-valuenow={Math.min(pct, 100)} aria-valuemin={0} aria-valuemax={100}>
-                <div className={`h-full ${over ? "bg-red-600" : warn ? "bg-amber-500" : "bg-emerald-600"}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                <div className={`h-full ${b.invest ? "bg-sky-600" : over ? "bg-red-600" : warn ? "bg-amber-500" : "bg-emerald-600"}`} style={{ width: `${Math.min(pct, 100)}%` }} />
               </div>
-              <div className="text-sm">{formatMinor(u, b.currency)} of {formatMinor(b.limitMinor, b.currency)} ({pct}%)</div>
+              <div className="text-sm">{formatMinor(u, b.currency)} {b.invest ? "invested" : ""} of {formatMinor(b.limitMinor, b.currency)} ({pct}%)</div>
+              {b.invest && <p className="text-xs text-muted">{u >= b.limitMinor ? "Monthly investing budget reached. " : ""}Counts money added with the Invest tab. It is not spending.</p>}
               {warn && (
                 <p role="alert" className={`text-sm ${over ? "text-red-600" : "text-amber-600"}`}>
                   {over ? `Over budget by ${formatMinor(u - b.limitMinor, b.currency)}` : completed ? "Budget completed" : `You have passed ${b.alertAtPct}% of this budget`}
@@ -133,7 +136,7 @@ export default async function Budgets() {
 
       <form action={setBudget} className="card grid grid-cols-2 gap-2">
         <h2 className="col-span-2 font-semibold">Set a budget</h2>
-        <select name="categoryId" className="input" aria-label="Category"><option value="">Overall</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+        <select name="categoryId" className="input" aria-label="Category"><option value="">Overall</option><option value="__invest">Investments (money invested)</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <select name="currency" className="input" aria-label="Currency" defaultValue={user.defaultCurrency}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
         <input name="limit" inputMode="decimal" className="input" placeholder="Monthly limit" aria-label="Monthly limit" required />
         <CadHint amountName="limit" className="col-span-2" />

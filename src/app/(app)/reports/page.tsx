@@ -33,7 +33,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
 
   // Budget vs used, per category. Budgets are monthly, so "used" is this month's spending only.
   const { start, end } = monthRange();
-  const budgets = await db.budget.findMany({ where: { userId: user.id, currency }, include: { category: true } });
+  const budgets = await db.budget.findMany({ where: { userId: user.id, currency, invest: false }, include: { category: true } }); // the investing budget is not spending
   const monthTxns = txns.filter((t) => t.date >= start && t.date < end);
   const usedBy = (categoryId: string | null) => monthTxns.filter((t) => categoryId === null || t.categoryId === categoryId).reduce((a, t) => a + t.amountMinor, 0);
   const budgetRows = budgets

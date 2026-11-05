@@ -143,6 +143,8 @@ model Budget {
   limitMinor  Int
   currency    String
   alertAtPct  Int       @default(80)
+  // true = the monthly investing budget: tracks money put in through the Invest tab (not spending), has no category.
+  invest      Boolean   @default(false)
 
   @@unique([userId, categoryId, currency])
 }

@@ -297,6 +297,7 @@ export async function addCategory(f: FormData) {
   const name = s(f, "name");
   const parentId = s(f, "parentId") || null;
   if (!name) return;
+  if (/^invest(ing|ment|ments)?$/i.test(name.trim())) return; // investing is not an expense: it has the Invest tab and its own budget
   if (parentId && !(await db.category.count({ where: { id: parentId, userId: u.id } }))) return;
   await db.category.create({ data: { userId: u.id, name, parentId } });
   revalidatePath("/settings");
@@ -306,14 +307,15 @@ export async function setBudget(f: FormData) {
   const u = await requireUser();
   const currency = s(f, "currency") || u.defaultCurrency;
   const limitMinor = parseToMinor(s(f, "limit"), currency);
-  const categoryId = s(f, "categoryId") || null;
+  const invest = s(f, "categoryId") === "__invest"; // the monthly investing budget, tracked against the Invest tab
+  const categoryId = invest ? null : s(f, "categoryId") || null;
   if (!limitMinor) return;
   if (categoryId && !(await db.category.count({ where: { id: categoryId, userId: u.id } }))) return;
-  const existing = await db.budget.findFirst({ where: { userId: u.id, categoryId, currency } });
+  const existing = await db.budget.findFirst({ where: { userId: u.id, categoryId, currency, invest } });
   const alertAtPct = Math.min(100, Math.max(1, Number(s(f, "alert")) || 80));
   if (existing) await db.budget.update({ where: { id: existing.id }, data: { limitMinor, alertAtPct } });
-  else await db.budget.create({ data: { userId: u.id, categoryId, currency, limitMinor, alertAtPct } });
-  revalidatePath("/budgets");
+  else await db.budget.create({ data: { userId: u.id, categoryId, currency, limitMinor, alertAtPct, invest } });
+  revalidatePath("/budgets"); revalidatePath("/");
 }
 
 /** Edit a saved budget's monthly limit and alert threshold. Category and currency identify the budget, so they stay fixed. */
@@ -328,13 +330,14 @@ export async function updateBudget(id: string, f: FormData): Promise<{ ok: true 
   await db.budget.update({ where: { id }, data: { limitMinor, alertAtPct } });
   revalidatePath("/budgets");
   revalidatePath("/reports");
+  revalidatePath("/");
   return { ok: true };
 }
 
 export async function deleteBudget(id: string) {
   const u = await requireUser();
   await db.budget.deleteMany({ where: { id, userId: u.id } });
-  revalidatePath("/budgets");
+  revalidatePath("/budgets"); revalidatePath("/");
 }
 
 const recurringSchema = z.object({

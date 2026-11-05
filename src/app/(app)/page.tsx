@@ -10,7 +10,7 @@ import { deleteTxn } from "@/app/actions";
 export default async function Home() {
   const user = await requireUser();
   const { start, end } = monthRange();
-  const [categories, accounts, recent, month, memberships, holdings, goals] = await Promise.all([
+  const [categories, accounts, recent, month, memberships, holdings, goals, investBudgets] = await Promise.all([
     db.category.findMany({ where: { userId: user.id, parentId: null }, orderBy: { name: "asc" } }),
     db.account.findMany({ where: { userId: user.id, archived: false } }),
     db.transaction.findMany({
@@ -21,6 +21,7 @@ export default async function Home() {
     db.member.findMany({ where: { userId: user.id, left: false, group: { deletedAt: null } }, include: { group: { include: { members: { where: { left: false }, select: { id: true } } } } } }),
     db.investment.findMany({ where: { userId: user.id }, select: { name: true, platform: true, currency: true, investedMinor: true, valueMinor: true, assetType: true, goalId: true } }),
     db.investmentGoal.findMany({ where: { userId: user.id }, select: { id: true, name: true, currency: true }, orderBy: { name: "asc" } }),
+    db.budget.findMany({ where: { userId: user.id, invest: true }, select: { currency: true, limitMinor: true } }),
   ]);
   const worth = totalsByCurrency(holdings);
   const groupOpts = memberships.map((m) => ({ id: m.groupId, name: m.group.name, meId: m.id, memberIds: m.group.members.map((x) => x.id), currency: m.group.defaultCurrency }));
@@ -64,6 +65,18 @@ export default async function Home() {
             <Link href="/investments" className="-m-2 p-2 text-xs underline">Investments</Link>
           </div>
           {sum("INVEST").length ? sum("INVEST").map((r) => <div key={r.currency} className="break-words text-lg font-semibold text-sky-600 sm:text-xl">{formatMinor(r._sum.amountMinor ?? 0, r.currency)}</div>) : <div className="text-lg font-semibold sm:text-xl">0</div>}
+          {investBudgets.map((b) => {
+            const done = sum("INVEST").filter((r) => r.currency === b.currency).reduce((a, r) => a + (r._sum.amountMinor ?? 0), 0);
+            const pct = Math.floor((done / b.limitMinor) * 100);
+            return (
+              <div key={b.currency} className="mt-2">
+                <div className="h-2 overflow-hidden rounded bg-black/10 dark:bg-white/10" role="progressbar" aria-label={`Investing budget ${b.currency}`} aria-valuenow={Math.min(pct, 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="h-full bg-sky-600" style={{ width: `${Math.min(pct, 100)}%` }} />
+                </div>
+                <div className="mt-1 text-xs text-muted">{formatMinor(done, b.currency)} of your {formatMinor(b.limitMinor, b.currency)} monthly investing budget ({pct}%) · <Link href="/budgets" className="underline">Budgets</Link></div>
+              </div>
+            );
+          })}
           {Object.entries(worth).length > 0 && (
             <div className="mt-1 text-xs text-muted">Portfolio value: {Object.entries(worth).map(([c, t]) => formatMinor(t.valueMinor, c)).join(", ")}. Not counted as spending or in budgets.</div>
           )}
